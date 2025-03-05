@@ -39,12 +39,13 @@ class MaskDetectorConfig:
 
     def _get_model_path(self):
         """Zwraca poprawną ścieżkę do modelu, uwzględniając uruchomienie jako .exe."""
-        if getattr(sys, 'frozen', False):  # Sprawdza, czy działa jako skompilowany .exe
-            base_path = sys._MEIPASS  # Tymczasowy katalog PyInstaller
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))  # Normalny katalog skryptu
+        # if getattr(sys, 'frozen', False):  # Sprawdza, czy działa jako skompilowany .exe
+        #     base_path = sys._MEIPASS  # Tymczasowy katalog PyInstaller
+        # else:
+        #     base_path = os.path.dirname(os.path.abspath(__file__))  # Normalny katalog skryptu
 
-        return os.path.join(base_path, "models", "sam_vit_h.pth")
+        # return os.path.join(base_path, "models", "sam_vit_h.pth")
+        return "./models/sam_vit_h.pth"
     
 class MaskDetectorBuilder:
     """
