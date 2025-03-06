@@ -24,7 +24,9 @@ def run_gui(main_script: callable):
     
     def start_main_script():
         root.withdraw()# Hide the GUI
+        print("Starting main script...")
         main_script(get_params_from_gui())
+        print("Main script finished...")
         root.quit() # Stop the mainloop
     
     root = tk.Tk()
@@ -82,7 +84,6 @@ def run_gui(main_script: callable):
     ttk.Label(frame, text="Użycie ROI:").grid(row=6, column=0, sticky="w")
     ttk.Checkbutton(frame, variable=var_is_roi).grid(row=6, column=1, sticky="w")
 
-    print(get_params_from_gui())
     # Przycisk Dalej
     ttk.Button(frame, text="Dalej", command=start_main_script).grid(row=7, column=0, columnspan=3, pady=10)
 

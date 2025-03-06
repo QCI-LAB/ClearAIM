@@ -26,7 +26,7 @@ class MaskDetectorConfig:
 
     def __init__(self):
         self.model_type = "vit_h"
-        self.checkpoint_path = self._get_model_path()
+        self.checkpoint_path = self._get_resource_path(r"models\\sam_vit_h.pth")
         self.is_display = True
         self.downscale_factor = 5
         self.image_extensions = ('.tiff', '.tif', '.png', '.jpg', '.jpeg', '.bmp')
@@ -37,15 +37,16 @@ class MaskDetectorConfig:
         self.is_roi = False
 
 
-    def _get_model_path(self):
-        """Zwraca poprawną ścieżkę do modelu, uwzględniając uruchomienie jako .exe."""
-        # if getattr(sys, 'frozen', False):  # Sprawdza, czy działa jako skompilowany .exe
-        #     base_path = sys._MEIPASS  # Tymczasowy katalog PyInstaller
-        # else:
-        #     base_path = os.path.dirname(os.path.abspath(__file__))  # Normalny katalog skryptu
+    def _get_resource_path(self, relative_path):
+        """Zwraca poprawną ścieżkę do zasobu w trybie standalone"""
+        if getattr(sys, 'frozen', False):
+            # Tryb standalone (.exe)
+            base_path = sys._MEIPASS
+        else:
+            # Tryb skryptu
+            base_path = os.path.abspath(".")
 
-        # return os.path.join(base_path, "models", "sam_vit_h.pth")
-        return "./models/sam_vit_h.pth"
+        return os.path.join(base_path, relative_path)
     
 class MaskDetectorBuilder:
     """
@@ -445,7 +446,8 @@ class MaskDetector:
 
         if self.is_roi:
             first_image = ImageProcessor.crop_image(first_image, self.box_roi)
-                    
+                
+        print(f"Select {self.num_positive_points} positive points on the image")
         points_positive = get_click_coordinates(
             cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR)
         )
