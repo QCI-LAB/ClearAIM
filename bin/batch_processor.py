@@ -1,98 +1,151 @@
 import os
+from pathlib import Path
+import datetime
+import pandas as pd
+import cv2
 
-def find_deepest_subfolders(root_folder, ignore_names):
-    """
-    Przeszukuje drzewo katalogów począwszy od `root_folder`,
-    ignorując foldery o nazwach znajdujących się w `ignore_names`,
-    i zwraca listę pełnych ścieżek do najgłębszych (bez podfolderów) folderów.
-    
-    Parametry:
-      root_folder: Ścieżka do katalogu głównego.
-      ignore_names: Lista nazw folderów, które mają być ignorowane.
-    """
-    deepest_folders = []
-    for current, dirs, _ in os.walk(root_folder, topdown=True):
-        # Usuń foldery, które znajdują się na liście ignorowanych
-        dirs[:] = [d for d in dirs if d not in ignore_names]
-        # Jeśli po przefiltrowaniu nie pozostały podfoldery, katalog jest najgłębszy
-        if not dirs:
-            deepest_folders.append(current)
-    return deepest_folders
+# Ustalenie katalogu głównego projektu i dodanie go do sys.path
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-def create_results_folders(source_folder, deepest_folders):
-    """
-    Dla każdego folderu z listy `deepest_folders` utwórz analogiczny folder w 
-    katalogu 'results' umieszczonym wewnątrz `source_folder`.
-    
-    Parametry:
-        source_folder: Ścieżka do głównego folderu źródłowego.
-        deepest_folders: Lista najgłębszych folderów znalezionych w source_folder.
-    """
-    results_base = os.path.join(source_folder, 'results')
-    for path in deepest_folders:
-        new_path = path.replace(source_folder, results_base)
-        if not os.path.exists(new_path):
-            os.makedirs(new_path)
+from src.mask_detector import MaskDetectorConfig, ImageProcessor, get_click_coordinates
+from src.mask_detector import MaskDetector
+
+class BatchProcessor:
+    def __init__(self, source_folder, ignore, csv_path):
+        self.source_folder = Path(source_folder)
+        self.ignore = ignore
+        self.csv_path = Path(csv_path)
+        self.results_base = self.source_folder.parent / 'results_mask'
+
+    def find_deepest_subfolders(self):
+        """
+        Przeszukuje drzewo katalogów począwszy od source_folder,
+        ignorując foldery o nazwach znajdujących się na liście ignore,
+        i zwraca listę pełnych ścieżek do najgłębszych folderów.
+        """
+        deepest_folders = []
+        for current, dirs, _ in os.walk(self.source_folder):
+            dirs[:] = [d for d in dirs if d not in self.ignore]
+            if not dirs:
+                deepest_folders.append(current)
+        return deepest_folders
+
+    def create_results_folders(self, deepest_folders):
+        """
+        Dla każdego folderu z listy deepest_folders utwórz analogiczny
+        folder w katalogu 'results_mask' wewnątrz katalogu nadrzędnego source_folder.
+        """
+        for folder in deepest_folders:
+            folder = Path(folder)
+            relative_folder = folder.relative_to(self.source_folder)
+            new_path = self.results_base / relative_folder
+            new_path.mkdir(parents=True, exist_ok=True)
             print(f"Utworzono folder: {new_path}")
-        else:
-            print(f"Folder już istnieje: {new_path}")
 
-# Przykład użycia:
-if __name__ == "__main__":
-    folder = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials'
-    ignore = ['odrzucone']
-    path_to_csv = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials\folder_processing_status.csv'
-    wynik = find_deepest_subfolders(folder, ignore)
-    print("Najgłębsze foldery (ścieżki względne):")
-    for path in wynik:
-        print(path)
-        
-    # Stwórz analogiczne foldery ale w folderze o nazwie results
-    create_results_folders(folder, wynik)
-    print("Foldery wynikowe utworzone w katalogu 'results'.")
-    
-    # Make list in CSV that says if folder was processed or not
-    # Create a CSV file with the folder names and processed status
-    import pandas as pd
-    import datetime
-    from pathlib import Path
-    import os
-    
-    if not os.path.exists(path_to_csv):
-        # Create the directory if it doesn't exist
-        Path(path_to_csv).parent.mkdir(parents=True, exist_ok=True)
-        # Create a DataFrame with the folder names and processed status
+    def update_processing_csv(self, deepest_folders):
+        """
+        Tworzy lub aktualizuje plik CSV zawierający status przetwarzania folderów.
+        """
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         data = {
-            "Folder Name": [os.path.basename(path) for path in wynik],
-            "Processed": ["No" for _ in wynik],
-            "Date": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") for _ in wynik]
+            "Folder Name": [Path(path).name for path in deepest_folders],
+            "Processed": ["No"] * len(deepest_folders),
+            "Date": [current_time] * len(deepest_folders)
         }
-        df = pd.DataFrame(data)
-        
-        #Save the DataFrame to a CSV file
-        df.to_csv(path_to_csv, index=False)
-        print(f"Plik CSV z nazwami folderów i statusem przetwarzania został zapisany jako {path_to_csv}.")
-    else:
-        # Load the existing CSV file
-        df = pd.read_csv(path_to_csv)
-        
-        # Update the DataFrame with the new folder names and processed status
-        new_data = {
-            "Folder Name": [os.path.basename(path) for path in wynik],
-            "Processed": ["No" for _ in wynik],
-            "Date": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") for _ in wynik]
-        }
-        new_df = pd.DataFrame(new_data)
-        
-        # Append the new data to the existing DataFrame
-        df = pd.concat([df, new_df], ignore_index=True)
-        
-        # Save the updated DataFrame to the CSV file
-        df.to_csv(path_to_csv, index=False)
-        print(f"Plik CSV zaktualizowany i zapisany jako {path_to_csv}.")
-    
-    
-    
-    
-    
+        new_df = pd.DataFrame(data)
+        if self.csv_path.exists():
+            df = pd.read_csv(self.csv_path)
+            df = pd.concat([df, new_df], ignore_index=True)
+            action = "zaktualizowany"
+        else:
+            self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+            df = new_df
+            action = "zapisany"
 
+        df.to_csv(self.csv_path, index=False)
+        print(f"Plik CSV został {action} jako {self.csv_path}")
+
+    def process_images(self, deepest_folders):
+        """
+        Przetwarza obrazy dla każdego niepustego folderu znajdującego się na liście deepest_folders.
+        Wykorzystuje konfigurację i funkcje importowane z modułu 'src.mask_detector'
+        """
+        configs = []
+        for folder in deepest_folders:
+            folder = Path(folder)
+            if not any(folder.iterdir()):
+                print(f"Folder {folder} jest pusty. Pomijam.")
+                continue
+
+            paths_image = list(folder.rglob('*.jpg')) + list(folder.rglob('*.png'))
+            paths_image = [str(path) for path in paths_image]
+
+            config = MaskDetectorConfig()
+            config.folderpath_source = str(folder)
+            # Tworzymy folder wynikowy analogicznie do struktury z source_folder
+            config.folderpath_save = str(Path(str(folder)).as_posix().replace(str(self.source_folder), str(self.results_base)))
+            config.num_negative_points = 20
+            config.is_display = False
+            config.is_roi = False
+            config.downscale_factor = 1.0
+
+            # Inicjalizacja od pierwszego obrazu
+            first_image = ImageProcessor.load_image(paths_image[0])
+            first_image = ImageProcessor.rescale(first_image, 1/config.downscale_factor)
+
+            # Wybór ROI
+            cv2.namedWindow("Select ROI", cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty("Select ROI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            cv2.imshow("Select ROI", first_image)
+            cv2.waitKey(1)
+            roi = cv2.selectROI("Select ROI", first_image, False, False)
+            cv2.destroyWindow("Select ROI")
+            config.box_roi = roi
+
+            first_image = ImageProcessor.crop_image(first_image, config.box_roi)
+
+            print(f"Wybierz {config.num_positive_points} pozytywne punkty na obrazie")
+            init_points_positive = get_click_coordinates(
+                cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR),
+                config.num_positive_points
+            )
+            config.init_points_positive = init_points_positive
+            configs.append(config)
+
+        # Wczytanie danych z CSV
+        df = pd.read_csv(self.csv_path)
+        for config in configs:
+            folder_name = Path(config.folderpath_source).name
+            if df[df['Folder Name'] == folder_name]['Processed'].values[0] == "Yes":
+                print(f"Folder {config.folderpath_source} już przetworzony.")
+                continue
+
+            detector = MaskDetector(config=config)
+            detector.process_images()
+            print(f"Folder {config.folderpath_source} przetworzony.")
+
+            # Aktualizacja statusu w pliku CSV
+            df.loc[df['Folder Name'] == folder_name, 'Processed'] = "Yes"
+            df.to_csv(self.csv_path, index=False)
+            print(f"Status przetwarzania folderu {config.folderpath_source} zaktualizowany w pliku CSV.")
+
+    def run(self):
+        deepest = self.find_deepest_subfolders()
+        print("Najgłębsze foldery (ścieżki pełne):")
+        for path in deepest:
+            print(path)
+        self.create_results_folders(deepest)
+        print("Foldery wynikowe utworzone w katalogu 'results_mask'.")
+        self.update_processing_csv(deepest)
+        self.process_images(deepest)
+
+if __name__ == "__main__":
+    source_folder = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials'
+    ignore = ['odrzucone']
+    csv_path = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials\folder_processing_status.csv'
+    
+    processor = BatchProcessor(source_folder, ignore, csv_path)
+    processor.run()

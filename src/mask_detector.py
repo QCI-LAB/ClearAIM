@@ -187,6 +187,7 @@ class MaskDetectorBuilder:
     def build(self) -> 'MaskDetector':
         """Constructs and returns a MaskDetector object with the configured parameters."""
         return MaskDetector(self._config)
+    
 
 
 class ImagePathUtility:
@@ -461,7 +462,7 @@ class MaskDetector:
             self.box_roi = self._choose_roi_box()
             
 
-    def process_images(self, init_points_positive=None) -> None:
+    def process_images(self) -> None:
         """Main processing pipeline"""
         paths_image = ImagePathUtility.get_image_paths(self.folderpath_source,
                                                        self.image_extensions)
@@ -498,7 +499,7 @@ class MaskDetector:
             # Save mask and update center
             output_path = self._get_save_path(path_image)
             
-            if self.is_roi:
+            if self.box_roi:
                 mask_final = np.zeros(image_rescaled.shape[:2], dtype=np.uint8)
                 mask_final[self.box_roi[1]:self.box_roi[1]+self.box_roi[3],
                             self.box_roi[0]:self.box_roi[0]+self.box_roi[2]] = state.mask_current
