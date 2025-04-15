@@ -23,14 +23,14 @@ def run_gui(main_script: callable):
         return params
     
     def start_main_script():
-        root.withdraw()# Hide the GUI
+        root.withdraw()  # Hide the GUI
         print("Starting main script...")
         main_script(get_params_from_gui())
         print("Main script finished...")
-        root.quit() # Stop the mainloop
+        root.quit()  # Stop the mainloop
     
     root = tk.Tk()
-    root.title("Ustawienia Programu")
+    root.title("Program Settings")
 
     root.resizable(False, False)
     root.configure(padx=10, pady=10)
@@ -42,9 +42,9 @@ def run_gui(main_script: callable):
     frame = ttk.Frame(root, padding=10)
     frame.grid(row=0, column=0)
 
-    # Wyświetlanie wyników
+    # Display results
     var_is_display = tk.BooleanVar()
-    ttk.Label(frame, text="Wyświetlanie wyników:").grid(row=0, column=0, sticky="w")
+    ttk.Label(frame, text="Display results:").grid(row=0, column=0, sticky="w")
     ttk.Checkbutton(frame, variable=var_is_display).grid(row=0, column=1, sticky="w")
 
     # Downscale Factor
@@ -53,43 +53,39 @@ def run_gui(main_script: callable):
     ttk.Label(frame, text="Downscale Factor:").grid(row=1, column=0, sticky="w")
     entry_downscale_factor.grid(row=1, column=1)
 
-    # Folder źródłowy
+    # Source folder
     entry_folderpath_source = ttk.Entry(frame, width=40)
     entry_folderpath_source.insert(0, r".\Materials")
-    ttk.Label(frame, text="Folder źródłowy:").grid(row=2, column=0, sticky="w")
+    ttk.Label(frame, text="Source folder:").grid(row=2, column=0, sticky="w")
     entry_folderpath_source.grid(row=2, column=1)
-    ttk.Button(frame, text="Przeglądaj", command=lambda: browse_folder(entry_folderpath_source)).grid(row=2, column=2)
+    ttk.Button(frame, text="Browse", command=lambda: browse_folder(entry_folderpath_source)).grid(row=2, column=2)
 
-    # Folder zapisu
+    # Save folder
     entry_folderpath_save = ttk.Entry(frame, width=40)
     entry_folderpath_save.insert(0, r".\Results")
-    ttk.Label(frame, text="Folder zapisu:").grid(row=3, column=0, sticky="w")
+    ttk.Label(frame, text="Save folder:").grid(row=3, column=0, sticky="w")
     entry_folderpath_save.grid(row=3, column=1)
-    ttk.Button(frame, text="Przeglądaj", command=lambda: browse_folder(entry_folderpath_save)).grid(row=3, column=2)
+    ttk.Button(frame, text="Browse", command=lambda: browse_folder(entry_folderpath_save)).grid(row=3, column=2)
 
-    # Liczba pozytywnych punktów
+    # Number of positive points
     entry_num_positive_points = ttk.Entry(frame)
     entry_num_positive_points.insert(0, "2")
-    ttk.Label(frame, text="Liczba pozytywnych punktów:").grid(row=4, column=0, sticky="w")
+    ttk.Label(frame, text="Number of positive points:").grid(row=4, column=0, sticky="w")
     entry_num_positive_points.grid(row=4, column=1)
 
-    # Liczba negatywnych punktów
+    # Number of negative points
     entry_num_negative_points = ttk.Entry(frame)
     entry_num_negative_points.insert(0, "12")
-    ttk.Label(frame, text="Liczba negatywnych punktów:").grid(row=5, column=0, sticky="w")
+    ttk.Label(frame, text="Number of negative points:").grid(row=5, column=0, sticky="w")
     entry_num_negative_points.grid(row=5, column=1)
 
-    # Użycie ROI
+    # Use ROI
     var_is_roi = tk.BooleanVar()
-    ttk.Label(frame, text="Użycie ROI:").grid(row=6, column=0, sticky="w")
+    ttk.Label(frame, text="Use ROI:").grid(row=6, column=0, sticky="w")
     ttk.Checkbutton(frame, variable=var_is_roi).grid(row=6, column=1, sticky="w")
 
-    # Przycisk Dalej
-    ttk.Button(frame, text="Dalej", command=start_main_script).grid(row=7, column=0, columnspan=3, pady=10)
+    # Next button
+    ttk.Button(frame, text="Next", command=start_main_script).grid(row=7, column=0, columnspan=3, pady=10)
 
     root.mainloop()
 
-if __name__ == "__main__":
-    def print_1(params):
-        print(1)
-    run_gui(print_1)
