@@ -35,6 +35,8 @@ class MaskDetectorConfig:
         self.num_positive_points = 2
         self.num_negative_points = 12
         self.is_roi = False
+        self.init_points_positive = None
+        self.box_roi = None
 
 
     def _get_resource_path(self, relative_path):
@@ -157,6 +159,30 @@ class MaskDetectorBuilder:
     @is_roi.setter
     def is_roi(self, value):
         self._config.is_roi = value
+        
+    @property
+    def box_roi(self) -> tuple:
+        """tuple: Coordinates of the region of interest for mask detection."""
+        return self._config.box_roi
+    
+    @box_roi.setter
+    def box_roi(self, value: tuple):
+        assert isinstance(value, tuple), "box_roi must be a tuple"
+        assert len(value) == 4, "box_roi must have 4 elements (x, y, w, h)"
+        assert all(isinstance(i, int) for i in value), "box_roi must contain integers"
+        assert value[0] >= 0 and value[1] >= 0, "box_roi coordinates must be non-negative"
+        assert value[2] > 0 and value[3] > 0, "box_roi width and height must be positive"
+    
+        self._config.box_roi = value
+        
+    @property
+    def init_points_positive(self) -> np.ndarray:
+        """np.ndarray: Initial positive points for mask detection."""
+        return self._config.init_points_positive
+    
+    @init_points_positive.setter
+    def init_points_positive(self, value: np.ndarray):
+        self._config.init_points_positive = value
 
     def build(self) -> 'MaskDetector':
         """Constructs and returns a MaskDetector object with the configured parameters."""
@@ -228,8 +254,8 @@ class ImageProcessor:
         """
         return cv2.resize(
             image,
-            (int(image.shape[1] // (1/rescale_factor)),
-            int(image.shape[0] // (1/rescale_factor)))
+            (int(image.shape[1] * rescale_factor),
+            int(image.shape[0] * rescale_factor))
             )
 
     @staticmethod
@@ -423,7 +449,8 @@ class MaskDetector:
         self.num_positive_points = config.num_positive_points
         self.num_negative_points = config.num_negative_points
         self.is_roi = config.is_roi
-        self.box_roi = None
+        self.box_roi = config.box_roi
+        self.init_points_positive = config.init_points_positive
 
         self._sam_predictor = SamPredictorWrapper(
             model_type=self._model_type,
@@ -434,7 +461,7 @@ class MaskDetector:
             self.box_roi = self._choose_roi_box()
             
 
-    def process_images(self):
+    def process_images(self, init_points_positive=None) -> None:
         """Main processing pipeline"""
         paths_image = ImagePathUtility.get_image_paths(self.folderpath_source,
                                                        self.image_extensions)
@@ -447,12 +474,15 @@ class MaskDetector:
         if self.is_roi:
             first_image = ImageProcessor.crop_image(first_image, self.box_roi)
                 
-        print(f"Select {self.num_positive_points} positive points on the image")
-        points_positive = get_click_coordinates(
-            cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR)
-        )
+        if self.init_points_positive is None:
+            print(f"Select {self.num_positive_points} positive points on the image")
+            init_points_positive = get_click_coordinates(
+                cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR)
+            )
+        else:
+            init_points_positive = self.init_points_positive
 
-        state = ImageProcessingState(points_positive, None, None, None)
+        state = ImageProcessingState(init_points_positive, None, None, None)
 
         # Process all images
         for path_image in tqdm(paths_image, desc="Processing images"):
