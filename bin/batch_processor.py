@@ -47,8 +47,15 @@ class BatchProcessor:
 
     def update_processing_csv(self, deepest_folders):
         """
-        Tworzy lub aktualizuje plik CSV zawierający status przetwarzania folderów.
+        Tworzy lub aktualizuje plik CSV zawierający status przetwarzania folderów,
+        unikając duplikowania rekordów.
         """
+        # Jeśli nie istnieje lub plik csv jest pusty to stwórz plik csv
+        if not self.csv_path.exists() or self.csv_path.stat().st_size == 0:
+            self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+            df = pd.DataFrame(columns=["Folder Name", "Processed", "Date"])
+            df.to_csv(self.csv_path, index=False)
+        
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "Folder Name": [Path(path).name for path in deepest_folders],
@@ -56,13 +63,20 @@ class BatchProcessor:
             "Date": [current_time] * len(deepest_folders)
         }
         new_df = pd.DataFrame(data)
-        if self.csv_path.exists():
+
+        # Próba wczytania CSV, przy pustym pliku utwórz DataFrame ze stałymi kolumnami
+        try:
             df = pd.read_csv(self.csv_path)
+        except pd.errors.EmptyDataError:
+            df = pd.DataFrame(columns=["Folder Name", "Processed", "Date"])
+
+        # Usuń rekordy, które już istnieją w CSV
+        new_df = new_df[~new_df['Folder Name'].isin(df['Folder Name'])]
+
+        if not new_df.empty:
             df = pd.concat([df, new_df], ignore_index=True)
             action = "zaktualizowany"
         else:
-            self.csv_path.parent.mkdir(parents=True, exist_ok=True)
-            df = new_df
             action = "zapisany"
 
         df.to_csv(self.csv_path, index=False)
@@ -73,8 +87,14 @@ class BatchProcessor:
         Przetwarza obrazy dla każdego niepustego folderu znajdującego się na liście deepest_folders.
         Wykorzystuje konfigurację i funkcje importowane z modułu 'src.mask_detector'
         """
+        df = pd.read_csv(self.csv_path)
         configs = []
         for folder in deepest_folders:
+            
+            if df[df['Folder Name'] == Path(folder).name]['Processed'].values[0] == "Yes":
+                print(f"Folder {folder} już przetworzony. Pomijam.")
+                continue
+    
             folder = Path(folder)
             if not any(folder.iterdir()):
                 print(f"Folder {folder} jest pusty. Pomijam.")
@@ -90,7 +110,7 @@ class BatchProcessor:
             config.num_negative_points = 20
             config.is_display = False
             config.is_roi = False
-            config.downscale_factor = 1.0
+            config.downscale_factor = 3.0
 
             # Inicjalizacja od pierwszego obrazu
             first_image = ImageProcessor.load_image(paths_image[0])
@@ -101,9 +121,9 @@ class BatchProcessor:
             cv2.setWindowProperty("Select ROI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             cv2.imshow("Select ROI", first_image)
             cv2.waitKey(1)
-            roi = cv2.selectROI("Select ROI", first_image, False, False)
+            box_roi = cv2.selectROI("Select ROI", first_image, False, False)
             cv2.destroyWindow("Select ROI")
-            config.box_roi = roi
+            config.box_roi = box_roi
 
             first_image = ImageProcessor.crop_image(first_image, config.box_roi)
 
@@ -136,7 +156,7 @@ class BatchProcessor:
         deepest = self.find_deepest_subfolders()
         print("Najgłębsze foldery (ścieżki pełne):")
         for path in deepest:
-            print(path)
+            print("    " + path)
         self.create_results_folders(deepest)
         print("Foldery wynikowe utworzone w katalogu 'results_mask'.")
         self.update_processing_csv(deepest)
@@ -144,7 +164,7 @@ class BatchProcessor:
 
 if __name__ == "__main__":
     source_folder = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials'
-    ignore = ['odrzucone']
+    ignore = ['odrzucone', 'temp']
     csv_path = r'C:\Praca\QCI Lab repozytoria\ClearAIM\Materials\folder_processing_status.csv'
     
     processor = BatchProcessor(source_folder, ignore, csv_path)

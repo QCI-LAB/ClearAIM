@@ -472,7 +472,7 @@ class MaskDetector:
         first_image = ImageProcessor.load_image(paths_image[0])
         first_image = ImageProcessor.rescale(first_image, 1/self.downscale_factor)
 
-        if self.is_roi:
+        if self.box_roi:
             first_image = ImageProcessor.crop_image(first_image, self.box_roi)
                 
         if self.init_points_positive is None:
@@ -489,7 +489,7 @@ class MaskDetector:
         for path_image in tqdm(paths_image, desc="Processing images"):
             image_rgb = ImageProcessor.load_image(path_image)
             image_rescaled = ImageProcessor.rescale(image_rgb, 1/self.downscale_factor)
-            if self.is_roi:
+            if self.box_roi:
                 image_processed = ImageProcessor.crop_image(image_rescaled, self.box_roi)
             else:
                 image_processed = image_rescaled
