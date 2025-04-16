@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import cv2
 
-# Ustalenie katalogu głównego projektu i dodanie go do sys.path
+# Determine the project root directory and add it to sys.path
 import sys
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
@@ -22,9 +22,9 @@ class BatchProcessor:
 
     def find_deepest_subfolders(self):
         """
-        Przeszukuje drzewo katalogów począwszy od source_folder,
-        ignorując foldery o nazwach znajdujących się na liście ignore,
-        i zwraca listę pełnych ścieżek do najgłębszych folderów.
+        Searches the directory tree starting from source_folder,
+        ignoring folders with names on the ignore list,
+        and returns a list of full paths to the deepest folders.
         """
         deepest_folders = []
         for current, dirs, _ in os.walk(self.source_folder):
@@ -35,22 +35,22 @@ class BatchProcessor:
 
     def create_results_folders(self, deepest_folders):
         """
-        Dla każdego folderu z listy deepest_folders utwórz analogiczny
-        folder w katalogu 'results_mask' wewnątrz katalogu nadrzędnego source_folder.
+        For each folder in the deepest_folders list, create an analogous
+        folder in the 'results_mask' directory inside the parent directory of source_folder.
         """
         for folder in deepest_folders:
             folder = Path(folder)
             relative_folder = folder.relative_to(self.source_folder)
             new_path = self.results_base / relative_folder
             new_path.mkdir(parents=True, exist_ok=True)
-            print(f"Utworzono folder: {new_path}")
+            print(f"Created folder: {new_path}")
 
     def update_processing_csv(self, deepest_folders):
         """
-        Tworzy lub aktualizuje plik CSV zawierający status przetwarzania folderów,
-        unikając duplikowania rekordów.
+        Creates or updates a CSV file containing the processing status of folders,
+        avoiding duplicate records.
         """
-        # Jeśli nie istnieje lub plik csv jest pusty to stwórz plik csv
+        # If it does not exist or the CSV file is empty, create a CSV file
         if not self.csv_path.exists() or self.csv_path.stat().st_size == 0:
             self.csv_path.parent.mkdir(parents=True, exist_ok=True)
             df = pd.DataFrame(columns=["Folder Name", "Processed", "Date"])
@@ -64,40 +64,40 @@ class BatchProcessor:
         }
         new_df = pd.DataFrame(data)
 
-        # Próba wczytania CSV, przy pustym pliku utwórz DataFrame ze stałymi kolumnami
+        # Try to load CSV, if the file is empty, create a DataFrame with constant columns
         try:
             df = pd.read_csv(self.csv_path)
         except pd.errors.EmptyDataError:
             df = pd.DataFrame(columns=["Folder Name", "Processed", "Date"])
 
-        # Usuń rekordy, które już istnieją w CSV
+        # Remove records that already exist in CSV
         new_df = new_df[~new_df['Folder Name'].isin(df['Folder Name'])]
 
         if not new_df.empty:
             df = pd.concat([df, new_df], ignore_index=True)
-            action = "zaktualizowany"
+            action = "updated"
         else:
-            action = "zapisany"
+            action = "saved"
 
         df.to_csv(self.csv_path, index=False)
-        print(f"Plik CSV został {action} jako {self.csv_path}")
+        print(f"CSV file {action} as {self.csv_path}")
 
     def process_images(self, deepest_folders):
         """
-        Przetwarza obrazy dla każdego niepustego folderu znajdującego się na liście deepest_folders.
-        Wykorzystuje konfigurację i funkcje importowane z modułu 'src.mask_detector'
+        Processes images for each non-empty folder in the deepest_folders list.
+        Uses configuration and functions imported from the 'src.mask_detector' module
         """
         df = pd.read_csv(self.csv_path)
         configs = []
         for folder in deepest_folders:
             
             if df[df['Folder Name'] == Path(folder).name]['Processed'].values[0] == "Yes":
-                print(f"Folder {folder} już przetworzony. Pomijam.")
+                print(f"Folder {folder} already processed. Skipping.")
                 continue
     
             folder = Path(folder)
             if not any(folder.iterdir()):
-                print(f"Folder {folder} jest pusty. Pomijam.")
+                print(f"Folder {folder} is empty. Skipping.")
                 continue
 
             paths_image = list(folder.rglob('*.jpg')) + list(folder.rglob('*.png'))
@@ -105,18 +105,19 @@ class BatchProcessor:
 
             config = MaskDetectorConfig()
             config.folderpath_source = str(folder)
-            # Tworzymy folder wynikowy analogicznie do struktury z source_folder
-            config.folderpath_save = str(Path(str(folder)).as_posix().replace(str(self.source_folder), str(self.results_base)))
+            # Create a result folder analogous to the structure from source_folder
+            relative_path = Path(folder).relative_to(self.source_folder)
+            config.folderpath_save = str(self.results_base / relative_path)
             config.num_negative_points = 20
             config.is_display = False
             config.is_roi = False
             config.downscale_factor = 3.0
 
-            # Inicjalizacja od pierwszego obrazu
+            # Initialization from the first image
             first_image = ImageProcessor.load_image(paths_image[0])
             first_image = ImageProcessor.rescale(first_image, 1/config.downscale_factor)
 
-            # Wybór ROI
+            # ROI selection
             cv2.namedWindow("Select ROI", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("Select ROI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             cv2.imshow("Select ROI", first_image)
@@ -127,7 +128,7 @@ class BatchProcessor:
 
             first_image = ImageProcessor.crop_image(first_image, config.box_roi)
 
-            print(f"Wybierz {config.num_positive_points} pozytywne punkty na obrazie")
+            print(f"Select {config.num_positive_points} positive points on the image")
             init_points_positive = get_click_coordinates(
                 cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR),
                 config.num_positive_points
@@ -135,30 +136,30 @@ class BatchProcessor:
             config.init_points_positive = init_points_positive
             configs.append(config)
 
-        # Wczytanie danych z CSV
+        # Load data from CSV
         df = pd.read_csv(self.csv_path)
         for config in configs:
             folder_name = Path(config.folderpath_source).name
             if df[df['Folder Name'] == folder_name]['Processed'].values[0] == "Yes":
-                print(f"Folder {config.folderpath_source} już przetworzony.")
+                print(f"Folder {config.folderpath_source} already processed.")
                 continue
 
             detector = MaskDetector(config=config)
             detector.process_images()
-            print(f"Folder {config.folderpath_source} przetworzony.")
+            print(f"Folder {config.folderpath_source} processed.")
 
-            # Aktualizacja statusu w pliku CSV
+            # Update status in CSV file
             df.loc[df['Folder Name'] == folder_name, 'Processed'] = "Yes"
             df.to_csv(self.csv_path, index=False)
-            print(f"Status przetwarzania folderu {config.folderpath_source} zaktualizowany w pliku CSV.")
+            print(f"Processing status of folder {config.folderpath_source} updated in CSV file.")
 
     def run(self):
         deepest = self.find_deepest_subfolders()
-        print("Najgłębsze foldery (ścieżki pełne):")
+        print("Deepest folders (full paths):")
         for path in deepest:
             print("    " + path)
         self.create_results_folders(deepest)
-        print("Foldery wynikowe utworzone w katalogu 'results_mask'.")
+        print("Result folders created in the 'results_mask' directory.")
         self.update_processing_csv(deepest)
         self.process_images(deepest)
 

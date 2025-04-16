@@ -1,4 +1,4 @@
-'''Module for detecting masks in images using the SAM model.'''
+"""Module for detecting masks in images using the SAM model."""
 # pylint: disable=no-member, import-error
 import sys
 import os
@@ -12,6 +12,7 @@ from src.utility import get_click_coordinates
 class MaskDetectorConfig:
     """
     Configuration class for the Mask Detector.
+    
     Attributes:
         model_type (str): The type of model to use. Default is "vit_h".
         checkpoint_path (str): Path to the model checkpoint file. Default is "models/sam_vit_h.pth".
@@ -23,7 +24,6 @@ class MaskDetectorConfig:
         num_positive_points (int): Number of positive points for mask detection.
         num_negative_points (int): Number of negative points for mask detection.
     """
-
     def __init__(self):
         self.model_type = "vit_h"
         self.checkpoint_path = self._get_resource_path(r"models\\sam_vit_h.pth")
@@ -38,41 +38,27 @@ class MaskDetectorConfig:
         self.init_points_positive = None
         self.box_roi = None
 
-
     def _get_resource_path(self, relative_path):
-        """Zwraca poprawną ścieżkę do zasobu w trybie standalone"""
+        """Returns the correct resource path in standalone mode."""
         if getattr(sys, 'frozen', False):
-            # Tryb standalone (.exe)
+            # Standalone mode (.exe)
             base_path = sys._MEIPASS
         else:
-            # Tryb skryptu
+            # Script mode
             base_path = os.path.abspath(".")
-
         return os.path.join(base_path, relative_path)
     
 class MaskDetectorBuilder:
     """
-    A builder class for constructing a MaskDetector object with configurable parameters.
-    Attributes:
-        model_type (str): The type of model to be used for mask detection.
-        checkpoint_path (str): The path to the model checkpoint.
-        is_display (bool): Flag to indicate whether to display the detection results.
-        downscale_factor (float): Factor by which to downscale the input images.
-        image_extensions (list): List of allowed image file extensions.
-        folderpath_source (str): Path to the source folder containing images.
-        folderpath_save (str): Path to the folder where results will be saved.
-        num_positive_points (int): Number of positive points for mask detection.
-        num_negative_points (int): Number of negative points for mask detection.
-        is_roi (bool): Flag to indicate whether to use a region of interest for mask detection.
-    Methods:
-        build(): Constructs and returns a MaskDetector object with the configured parameters.
+    Builder class for constructing a MaskDetector object with configurable parameters.
+    
+    Attributes and properties correspond to the MaskDetectorConfig attributes.
     """
     def __init__(self):
         self._config = MaskDetectorConfig()
 
     @property
     def model_type(self) -> str:
-        """str: The type of model to be used for mask detection."""
         return self._config.model_type
 
     @model_type.setter
@@ -81,7 +67,6 @@ class MaskDetectorBuilder:
 
     @property
     def checkpoint_path(self) -> str:
-        """str: The path to the model checkpoint."""
         return self._config.checkpoint_path
 
     @checkpoint_path.setter
@@ -90,7 +75,6 @@ class MaskDetectorBuilder:
 
     @property
     def is_display(self) -> bool:
-        """bool: Flag to indicate whether to display the detection results."""
         return self._config.is_display
 
     @is_display.setter
@@ -99,7 +83,6 @@ class MaskDetectorBuilder:
 
     @property
     def downscale_factor(self) -> float:
-        """float: Factor by which to downscale the input images."""
         return self._config.downscale_factor
 
     @downscale_factor.setter
@@ -108,7 +91,6 @@ class MaskDetectorBuilder:
 
     @property
     def image_extensions(self) -> list:
-        """list: List of allowed image file extensions."""
         return self._config.image_extensions
 
     @image_extensions.setter
@@ -117,7 +99,6 @@ class MaskDetectorBuilder:
 
     @property
     def folderpath_source(self) -> str:
-        """str: Path to the source folder containing images."""
         return self._config.folderpath_source
 
     @folderpath_source.setter
@@ -126,7 +107,6 @@ class MaskDetectorBuilder:
 
     @property
     def folderpath_save(self) -> str:
-        """str: Path to the folder where results will be saved."""
         return self._config.folderpath_save
 
     @folderpath_save.setter
@@ -135,7 +115,6 @@ class MaskDetectorBuilder:
 
     @property
     def num_positive_points(self) -> int:
-        """int: Number of positive points for mask detection."""
         return self._config.num_positive_points
 
     @num_positive_points.setter
@@ -144,7 +123,6 @@ class MaskDetectorBuilder:
 
     @property
     def num_negative_points(self) -> int:
-        """int: Number of negative points for mask detection."""
         return self._config.num_negative_points
 
     @num_negative_points.setter
@@ -153,18 +131,16 @@ class MaskDetectorBuilder:
 
     @property
     def is_roi(self) -> bool:
-        """bool: Flag to indicate whether to use a region of interest for mask detection."""
         return self._config.is_roi
-    
+
     @is_roi.setter
     def is_roi(self, value):
         self._config.is_roi = value
-        
+
     @property
     def box_roi(self) -> tuple:
-        """tuple: Coordinates of the region of interest for mask detection."""
         return self._config.box_roi
-    
+
     @box_roi.setter
     def box_roi(self, value: tuple):
         assert isinstance(value, tuple), "box_roi must be a tuple"
@@ -172,14 +148,12 @@ class MaskDetectorBuilder:
         assert all(isinstance(i, int) for i in value), "box_roi must contain integers"
         assert value[0] >= 0 and value[1] >= 0, "box_roi coordinates must be non-negative"
         assert value[2] > 0 and value[3] > 0, "box_roi width and height must be positive"
-    
         self._config.box_roi = value
-        
+
     @property
     def init_points_positive(self) -> np.ndarray:
-        """np.ndarray: Initial positive points for mask detection."""
         return self._config.init_points_positive
-    
+
     @init_points_positive.setter
     def init_points_positive(self, value: np.ndarray):
         self._config.init_points_positive = value
@@ -187,21 +161,17 @@ class MaskDetectorBuilder:
     def build(self) -> 'MaskDetector':
         """Constructs and returns a MaskDetector object with the configured parameters."""
         return MaskDetector(self._config)
-    
-
 
 class ImagePathUtility:
     """Utility class for handling image paths and saving masks as images."""
-
     @staticmethod
     def get_image_paths(input_dir: str, image_extensions: list) -> list:
         """
-        Retrieves image paths from the specified directory 
-        with the given list of supported image extensions.
+        Retrieves image paths from the specified directory given the supported extensions.
         
-        :param input_dir: Directory containing the images
-        :param image_extensions: List of supported image extensions
-        :return: List of image paths
+        :param input_dir: Directory containing images.
+        :param image_extensions: List of supported image extensions.
+        :return: List of image paths.
         """
         image_paths = [
             os.path.join(input_dir, f) for f in os.listdir(input_dir)
@@ -217,73 +187,64 @@ class ImagePathUtility:
     @staticmethod
     def save_mask_as_image(mask: np.ndarray, output_path: str) -> None:
         """
-        Saves the logical mask as an image at the given path.
-
-        :param mask: Logical mask (numpy array)
-        :param output_path: Path to the output file
+        Saves the binary mask as an image at the given path.
+        
+        :param mask: Binary mask (numpy array).
+        :param output_path: Path to the output file.
         """
-        mask = mask.astype(np.uint8)*255
+        mask = mask.astype(np.uint8) * 255
         cv2.imwrite(output_path, mask)
         print(f"Saved mask to {output_path}")
 
 class ImageProcessor:
     """Utility class for image processing operations."""
-
     @staticmethod
     def load_image(image_path: str) -> np.ndarray:
         """
-        Load an image from the specified file path.
+        Loads an image from the given file path.
         
-        :param image_path: Path to the image file
-        
-        :return: The loaded image as a numpy array
+        :param image_path: Path to the image file.
+        :return: Loaded image as a numpy array.
         """
         image = cv2.imread(image_path)
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
         return image_rgb
 
     @staticmethod
     def rescale(image: np.ndarray, rescale_factor: float) -> np.ndarray:
         """
-        Rescale an image by the specified factor.
+        Rescales an image by the specified factor.
         
-        :param image: The input image as a numpy array
-        :param rescale_factor: The factor by which to rescale the image
-        
-        :return: The rescaled image as a numpy array
+        :param image: Input image as a numpy array.
+        :param rescale_factor: Factor to rescale the image.
+        :return: Rescaled image.
         """
         return cv2.resize(
             image,
             (int(image.shape[1] * rescale_factor),
-            int(image.shape[0] * rescale_factor))
-            )
+             int(image.shape[0] * rescale_factor))
+        )
 
     @staticmethod
     def invert_mask(mask: np.ndarray) -> np.ndarray:
         """
-        Invert a binary mask.
+        Inverts a binary mask.
         
-        :param mask: The input binary mask as a numpy array (0 or 1)
-        
-        :return: The inverted binary mask as a numpy array
+        :param mask: Input binary mask (0 or 1).
+        :return: Inverted binary mask.
         """
-
         mask = mask * 255
-        return cv2.bitwise_not(mask)/255
+        return cv2.bitwise_not(mask) / 255
 
     @staticmethod
     def get_biggest_object_from_mask(mask: np.ndarray) -> np.ndarray:
         """
-        Extract the biggest object from a binary mask.
-
-        :param mask: The input binary mask as a numpy array (0 or 1)
+        Extracts the largest object from a binary mask.
         
-        :return: The binary mask containing only the biggest object
+        :param mask: Input binary mask (0 or 1).
+        :return: Binary mask containing only the largest object.
         """
-
-        # Get the biggest mask object
-        mask = mask.astype(np.uint8)*255
+        mask = mask.astype(np.uint8) * 255
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         mask_final = np.zeros_like(mask)
         if contours:
@@ -294,12 +255,11 @@ class ImageProcessor:
     @staticmethod
     def erode_mask(mask: np.ndarray, kernel_size: int = 5) -> np.ndarray:
         """
-        Erode the mask using a kernel of the specified size.
+        Erodes the mask using a specified kernel size.
         
-        :param mask: The input binary mask as a numpy array (0 or 1)
-        :param kernel_size: The size of the kernel for erosion
-        
-        :return: The eroded binary mask as a numpy array
+        :param mask: Input binary mask (0 or 1).
+        :param kernel_size: Kernel size for erosion.
+        :return: Eroded mask.
         """
         kernel = np.ones((kernel_size, kernel_size), np.uint8)
         return cv2.erode(mask, kernel, iterations=1)
@@ -307,129 +267,106 @@ class ImageProcessor:
     @staticmethod
     def crop_image(image: np.ndarray, box: tuple) -> np.ndarray:
         """
-        Crop an image using the specified bounding box.
+        Crops the image using the specified bounding box.
         
-        :param image: The input image as a numpy array
-        :param box: The bounding box coordinates (x, y, w, h)
-        
-        :return: The cropped image as a numpy array
+        :param image: Input image as a numpy array.
+        :param box: Bounding box coordinates (x, y, w, h).
+        :return: Cropped image.
         """
         x, y, w, h = box
         return image[y:y+h, x:x+w]
-    
 
 class MaskVisualizer:
     """Utility class for visualizing images with masks and points."""
-
     @staticmethod
     def _visualize_result(image, mask, points_positive, points_negative=None,
-                          alpha=0.5, point_radius = 5, point_thickness = 2) -> np.ndarray:
-        """Visualize the mask and points on the image.
+                          alpha=0.5, point_radius=5, point_thickness=2) -> np.ndarray:
+        """
+        Overlays the mask and points on the image for visualization.
         
-        :param image: The input image as a numpy array
-        :param mask: The mask to overlay on the image
-        :param points_positive: The positive points to display
-        :param points_negative: The negative points to display
-        :param alpha: The transparency of the mask overlay
-        :param point_radius: The radius of the points
-        :param point_thickness: The thickness of the points
-        
-        :return: The visualized image as a numpy array
+        :param image: Input image as a numpy array.
+        :param mask: Mask to overlay.
+        :param points_positive: Positive points to display.
+        :param points_negative: Negative points to display.
+        :param alpha: Transparency level for the mask overlay.
+        :param point_radius: Radius of the points.
+        :param point_thickness: Thickness of the points.
+        :return: Image with visualization overlay.
         """
         vis_image = image.copy()
         mask_colored = np.zeros_like(image)
         mask_colored[mask == 255] = [0, 255, 0]
         vis_image = cv2.addWeighted(vis_image, 1, mask_colored, alpha, 0)
-
         if points_positive is not None:
             for point in points_positive:
                 cv2.circle(vis_image,
-                        (int(point[0]), int(point[1])),
-                        point_radius,
-                        (0, 255, 0),
-                        point_thickness)
-
+                           (int(point[0]), int(point[1])),
+                           point_radius,
+                           (0, 255, 0),
+                           point_thickness)
         if points_negative is not None:
             for point in points_negative:
                 cv2.circle(vis_image,
-                        (int(point[0]), int(point[1])),
-                        point_radius,
-                        (255, 0, 0),
-                        point_thickness)
-
+                           (int(point[0]), int(point[1])),
+                           point_radius,
+                           (255, 0, 0),
+                           point_thickness)
         return vis_image
 
     @staticmethod
-    def display_image_with_data(image_rgb, mask = None,
-                                points_positive = None,
-                                points_negative = None,
-                                time_display = 0) -> None:
+    def display_image_with_data(image_rgb, mask=None,
+                                points_positive=None,
+                                points_negative=None,
+                                time_display=0) -> None:
         """
-        Display an image with the specified mask and points.
+        Displays the image with the provided mask and points.
         
-        :param image_rgb: The input image as a numpy array
-        :param mask: The mask to overlay on the image
-        :param points_positive: The positive points to display
-        :param points_negative: The negative points to display
-        :param time_display: The time in milliseconds to display the image
-        
-        :return: None
+        :param image_rgb: Input image as a numpy array.
+        :param mask: Mask to overlay on the image.
+        :param points_positive: Positive points to display.
+        :param points_negative: Negative points to display.
+        :param time_display: Duration (in milliseconds) to display the image.
         """
         if mask is not None:
             mask = mask.astype(np.uint8) * 255
-            # Visualize results
             vis_image = MaskVisualizer._visualize_result(image_rgb, mask,
                                                          points_positive, points_negative)
-            # Display visualization
             cv2.imshow('Mask Visualization', cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR))
             cv2.waitKey(time_display)
             cv2.destroyAllWindows()
 
 def distribute_points(mask, num_points):
     """
-    Distribute a specified number of points optimally on a binary mask using k-means clustering.
-
-    Args:
-        mask (np.ndarray): Binary mask array where points should be distributed.
-        num_points (int): Number of points to distribute.
-
-    Returns:
-        np.ndarray: Array of [x, y] coordinates for the distributed points.
+    Optimally distributes a number of points over a binary mask using k-means clustering.
+    
+    :param mask: Binary mask (numpy array) where points should be distributed.
+    :param num_points: Number of points to distribute.
+    :return: Array of [x, y] coordinates for the distributed points.
     """
-    # Get valid points from the mask
     y_indices, x_indices = np.where(mask == 1)
     if len(y_indices) == 0:
         return np.array([])
-
-    # Combine coordinates into a single array for clustering
     coordinates = np.column_stack((x_indices, y_indices))
-
-    # Use k-means clustering to find clusters
     kmeans = KMeans(n_clusters=min(num_points, len(coordinates)), random_state=0, n_init='auto')
     kmeans.fit(coordinates)
     cluster_centers = kmeans.cluster_centers_
-
-    # Round cluster centers to nearest integer coordinates
     distributed_points = np.round(cluster_centers).astype(int)
-
     return distributed_points
 
 class ImageProcessingState:
     """
-    Class to store the state of image processing.
+    Stores the state of image processing.
     
     Attributes:
-    
-    points_positive (np.ndarray): Array of positive points for mask detection.
-    points_negative (np.ndarray): Array of negative points for mask detection.
-    mask_current (np.ndarray): Current mask for the image.
-    mask_previous (np.ndarray): Previous mask for the image.
+        points_positive (np.ndarray): Array of positive points for mask detection.
+        points_negative (np.ndarray): Array of negative points for mask detection.
+        mask_current (np.ndarray): Current mask.
+        mask_previous (np.ndarray): Previous mask.
     """
-    def __init__(self, points_positive = None,
-                 points_negative = None,
-                 mask_current = None,
-                 mask_previous = None):
-
+    def __init__(self, points_positive=None,
+                 points_negative=None,
+                 mask_current=None,
+                 mask_previous=None):
         self.points_positive = points_positive
         self.points_negative = points_negative
         self.mask_current = mask_current
@@ -460,15 +397,16 @@ class MaskDetector:
         
         if self.is_roi:
             self.box_roi = self._choose_roi_box()
-            
 
     def process_images(self) -> None:
-        """Main processing pipeline"""
+        """
+        Main processing pipeline for detecting and saving masks.
+        """
         paths_image = ImagePathUtility.get_image_paths(self.folderpath_source,
                                                        self.image_extensions)
         os.makedirs(self.folderpath_save, exist_ok=True)
 
-        # Initialize with first image
+        # Initialize with the first image.
         first_image = ImageProcessor.load_image(paths_image[0])
         first_image = ImageProcessor.rescale(first_image, 1/self.downscale_factor)
 
@@ -485,7 +423,7 @@ class MaskDetector:
 
         state = ImageProcessingState(init_points_positive, None, None, None)
 
-        # Process all images
+        # Process all images.
         for path_image in tqdm(paths_image, desc="Processing images"):
             image_rgb = ImageProcessor.load_image(path_image)
             image_rescaled = ImageProcessor.rescale(image_rgb, 1/self.downscale_factor)
@@ -496,13 +434,13 @@ class MaskDetector:
             
             state = self.process_single_image(image_processed, state)
 
-            # Save mask and update center
+            # Save mask and update.
             output_path = self._get_save_path(path_image)
             
             if self.box_roi:
                 mask_final = np.zeros(image_rescaled.shape[:2], dtype=np.uint8)
                 mask_final[self.box_roi[1]:self.box_roi[1]+self.box_roi[3],
-                            self.box_roi[0]:self.box_roi[0]+self.box_roi[2]] = state.mask_current
+                           self.box_roi[0]:self.box_roi[0]+self.box_roi[2]] = state.mask_current
             else:
                 mask_final = state.mask_current
                  
@@ -510,52 +448,47 @@ class MaskDetector:
 
     def process_single_image(self, image_rgb: np.ndarray,
                              state: ImageProcessingState) -> ImageProcessingState:
-        """Process a single image"""
-
-        # Predict mask
+        """
+        Processes a single image: predicts the mask, visualizes (if enabled),
+        and updates the state with new positive and negative points.
+        """
         masks = self._sam_predictor.predict_mask(
             image_rgb,
             state.points_positive,
             state.points_negative,
             mask_input=state.mask_current
         )
-
         state.mask_current = ImageProcessor.get_biggest_object_from_mask(masks[1])
 
         if self.is_display:
             MaskVisualizer.display_image_with_data(image_rgb, state.mask_current,
                                                    state.points_positive, state.points_negative)
 
-        # get points for next frame
+        # Distribute points for the next frame.
         state.points_positive = distribute_points(ImageProcessor.erode_mask(state.mask_current, 5),
                                                   num_points=self.num_positive_points)
         state.points_negative = distribute_points(ImageProcessor.invert_mask(state.mask_current),
                                                   num_points=self.num_negative_points)
-
         return state
 
     def _get_save_path(self, path_image):
-        # Get the directory and filename from the input path
+        """
+        Constructs and returns the save path for the mask image corresponding to the input image.
+        """
         _, filename = os.path.split(path_image)
-
-        # Split the filename into name and extension
         name, ext = os.path.splitext(filename)
-
-        # Create a new filename for the mask
         mask_filename = f"{name}_mask{ext}"
-
-        # Combine the directory and new filename to create the output path
         output_path = os.path.join(self.folderpath_save, mask_filename)
-
         return output_path
 
     def _choose_roi_box(self) -> tuple:
-        """Choose a region of interest (ROI) box for mask detection."""
+        """
+        Opens a window to let the user choose a Region of Interest (ROI) for mask detection.
+        """
         paths_image = ImagePathUtility.get_image_paths(self.folderpath_source,
-                                                self.image_extensions)
+                                                        self.image_extensions)
         first_image = ImageProcessor.load_image(paths_image[0])
         first_image = ImageProcessor.rescale(first_image, 1/self.downscale_factor)
         box_roi = cv2.selectROI("Choose ROI", first_image, fromCenter=False, showCrosshair=True)
         cv2.destroyAllWindows()
         return box_roi
-    
