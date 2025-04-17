@@ -1,7 +1,7 @@
 import PyInstaller.__main__
 import os
 
-script_name = "main_detection_GUI.py"
+script_name = "gui/gui_mask_detector.py"
 model_relative_path = os.path.join("models", "sam_vit_h.pth")
 
 if not os.path.exists(model_relative_path):

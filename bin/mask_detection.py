@@ -1,4 +1,10 @@
 '''Script for running the mask detection on a folder of images.'''
+import sys
+from pathlib import Path
+# Add project directory to sys.path for imports to work from anywhere
+script_dir = Path(__file__).parent.resolve()
+project_root = script_dir.parent.resolve()
+sys.path.insert(0, str(project_root))
 
 from src.mask_detector import MaskDetectorBuilder
 
