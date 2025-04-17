@@ -1,56 +1,80 @@
 # ClearAIM
 
-**Clear Artificial Intelligence Monitoring** – a tool for biological image analysis using the Segment Anything Model (SAM) and MATLAB. It enables object mask detection and time-based analysis of image properties.
+**Clear Artificial Intelligence Monitoring** – a tool for biological image analysis using the Segment Anything Model (SAM) in Python, with optional time-series analysis in MATLAB.
 
 ---
 
 ## Setup
 
-### 1. Install dependencies
+1. **Install dependencies**
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 2. Download the SAM model
+2. **Download the SAM model**
 
-```bash
-python download_sam.py
-```
+   ```bash
+   python setup/download_sam.py
+   ```
 
-### 3. (Optional) Build a standalone `.exe` file
+3. **Build standalone executables (optional)**
 
-```bash
-python build_exe_file.py
-```
+   Run the helper script in `setup/`:
 
-> You can download a sample executable for Windows [here](https://drive.google.com/file/d/1DxwpeNgjtG6KxP-4_RjzXf9UCjP-uhOU/view?usp=sharing).  
-> It demonstrates how the program works without requiring any setup.
+   ```bash
+   python setup/build_exe_file.py
+   ```
+
+   This uses PyInstaller to create single-file executables for the GUIs. The output appears in `dist/`.
 
 ---
 
-## Mask detection (Python)
+## Requirements
 
-The file `main_mask_detection.py` is an example usage of the `MaskDetector` class.  
-It is **not** intended to be run directly from the terminal – you should modify the parameters in code.
+- Python 3.8+
+- Windows (recommended for full GUI support)
 
-```python
-from src.mask_detector import MaskDetectorBuilder
+---
 
-def transform_source_path_to_save_path(path_source: str) -> str:
-    return path_source.replace("Materials", "Result")
+## Project structure
 
-if __name__ == "__main__":
-    builder = MaskDetectorBuilder()
-    builder.folderpath_source = r".\Materials\500um brain\skrawek 3"
-    builder.folderpath_save = transform_source_path_to_save_path(builder.folderpath_source)
-    builder.num_negative_points = 20
-    builder.is_display = True
-    builder.is_roi = True
-
-    detector = builder.build()
-    detector.process_images()
 ```
+models/      # SAM model weight files (.pth)
+bin/         # Main scripts (mask detection and batch processing GUIs)
+gui/         # GUI modules (interface definitions)
+setup/       # setup scripts: download_sam.py and build_exe_file.py
+src/         # Core mask detection logic (MaskDetectorBuilder, MaskDetector)
+```
+
+---
+
+## Running the GUIs
+
+### Mask Detection GUI
+
+```bash
+python bin/gui.py
+```
+
+Configure parameters:
+- **Display results**: show live output.
+- **Downscale Factor**: scaling factor before processing.
+- **Source folder**: directory with input images.
+- **Save folder**: directory for output masks.
+- **Number of positive points**: number of positive initialization points.
+- **Number of negative points**: number of negative points.
+- **Use ROI**: crop to a region of interest before selecting points.
+
+Click **Run**. The GUI will hide and begin processing images.
+
+### Batch Processing GUI
+
+```bash
+python bin/batch_gui.py
+```
+
+Provides an interface to process multiple subfolders via `BatchProcessor`.
 
 ---
 
@@ -58,39 +82,15 @@ if __name__ == "__main__":
 
 The `main_analize.m` script:
 
-- loads image–mask pairs,
-- calculates Weber contrast, object area, and transmittance,
-- reads timestamps from EXIF metadata (if available),
-- plots metrics over time,
-- generates a video animation of the results.
+1. Loads image–mask pairs
+2. Computes Weber contrast, object area, and transmittance
+3. Reads timestamps from EXIF metadata (if available)
+4. Plots metrics over time
+5. Generates a video animation
 
-### How to run:
+### How to run
 
-1. Open the script in MATLAB.
-2. Set `path_images` and `path_masks` in the code.
-3. Run `main_analize`.
+1. Open `main_analize.m` in MATLAB
+2. Set `path_images` and `path_masks`
+3. Run the script
 
----
-
-## Folder structure
-
-```
-Materials/          # Input images
-Results/            # Output masks
-models/             # SAM model (.pth file)
-src/                # Mask detection logic
-```
-
----
-
-## Main files
-
-| File                  | Description                                             |
-|-----------------------|---------------------------------------------------------|
-| `main_mask_detection.py` | Example usage of the mask detector                     |
-| `main_analize.m`          | Analysis of results and animation generation          |
-| `download_sam.py`         | Downloads the required SAM model                      |
-| `build_exe_file.py`       | Creates a standalone `.exe` file (Windows only)       |
-| `requirements.txt`        | Python dependencies list                              |
-
----
