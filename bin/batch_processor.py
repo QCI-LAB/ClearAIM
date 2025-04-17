@@ -34,7 +34,7 @@ class BatchProcessor:
         return deepest_folders
 
     def create_results_folders(self, deepest_folders):
-        """
+        """ 
         For each folder in the deepest_folders list, create an analogous
         folder in the 'results_mask' directory inside the parent directory of source_folder.
         """
