@@ -20,22 +20,32 @@
 
 3. **Build standalone executables (optional)**
 
-   Run the helper script in `setup/`:
+   Run the dedicated scripts in `setup/`:
 
    ```bash
-   python setup/build_exe_file.py
+   python setup/build_exe_batch_processor.py
+   python setup/build_exe_mask_detection.py
    ```
 
    This uses PyInstaller to create single-file executables for the GUIs. The output appears in `dist/`.
 
----
+   **Alternatively, download ready-to-use `.exe` files here:**
+   - [gui_batch_processing.exe](http://gofile.me/67C1K/l6sFj2rqx)
+      - 👉 [Documentation for `gui_batch_processor.exe`](docs/gui_batch_processor.md)
+
+   - [gui_gui_mask_detector.exe](http://gofile.me/67C1K/yN2szAxD2)
+      - 👉 [Documentation for `gui_mask_detector.exe`](docs/gui_mask_detector.md)
+
+
+--- 
 
 ## Requirements
 
 - Python 3.8+
 - Windows (recommended for full GUI support)
+- **MATLAB with Computer Vision Toolbox** – *only required for result visualization and analysis in `main_analize.m`*
 
----
+--- 
 
 ## Project structure
 
@@ -54,7 +64,7 @@ src/         # Core mask detection logic (MaskDetectorBuilder, MaskDetector)
 ### Mask Detection GUI
 
 ```bash
-python bin/gui.py
+python bin/gui_gui_mask_detector.py
 ```
 
 Configure parameters:
@@ -68,13 +78,12 @@ Configure parameters:
 
 Click **Run**. The GUI will hide and begin processing images.
 
+
 ### Batch Processing GUI
 
 ```bash
-python bin/batch_gui.py
+python bin/gui_batch_processing.py
 ```
-
-Provides an interface to process multiple subfolders via `BatchProcessor`.
 
 ---
 
@@ -82,15 +91,15 @@ Provides an interface to process multiple subfolders via `BatchProcessor`.
 
 The `main_analize.m` script:
 
-1. Loads image–mask pairs
-2. Computes Weber contrast, object area, and transmittance
-3. Reads timestamps from EXIF metadata (if available)
-4. Plots metrics over time
+1. Loads image–mask pairs  
+2. Computes Weber contrast, object area, and transmittance  
+3. Reads timestamps from EXIF metadata (if available)  
+4. Plots metrics over time  
 5. Generates a video animation
 
 ### How to run
 
-1. Open `main_analize.m` in MATLAB
-2. Set `path_images` and `path_masks`
+1. Open `main_analize.m` in MATLAB  
+2. Set `path_images` and `path_masks`  
 3. Run the script
 
