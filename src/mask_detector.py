@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.cluster import KMeans
 from src.SAM_wrapper import SamPredictorWrapper
-from src.utility import get_click_coordinates, ImagePathUtility, ImageProcessor
+from src.utility import get_click_coordinates, ImageProcessor
 
 # Configure logging
 global_logger = logging.getLogger(__name__)
@@ -20,11 +20,6 @@ def distribute_points(mask: np.ndarray,
                       random_state: int = 0) -> np.ndarray:
     """
     Distribute points over a binary mask using k-means clustering.
-    :param mask: Binary mask (numpy array) where points should be distributed.
-    :param num_points: Number of points to distribute.
-    :param n_init: Number of initializations for KMeans clustering.
-    :param random_state: Random state for reproducibility.
-    :return: Array of [x, y] coordinates for the distributed points.
     """
     y_indices, x_indices = np.where(mask == 1)
     if len(y_indices) == 0:
@@ -40,24 +35,29 @@ def distribute_points(mask: np.ndarray,
 
 class MaskDetectorConfig:
     """
-    Configuration for MaskDetector behavior.
+    Configuration containing input and output paths.
     """
     def __init__(self):
+        # SAM model settings
         self.model_type = "vit_h"
         self.checkpoint_path = self._get_resource_path(r"models/sam_vit_h.pth")
+        # Visualization and resizing
         self.is_display = True
         self.downscale_factor = 5
-        self.image_extensions = ('.tiff', '.tif', '.png', '.jpg', '.jpeg', '.bmp')
-        self.folderpath_source = None
-        self.folderpath_save = None
+        # Clustering and mask parameters
         self.num_positive_points = 2
         self.num_negative_points = 12
-        self.is_roi = False
-        self.box_roi = None
-        self.init_points_positive = None
         self.erode_size = 5
         self.kmeans_n_init = 10
         self.kmeans_random_state = 0
+        # Region of interest
+        self.is_roi = False
+        self.box_roi = None
+        # Initial manual points
+        self.init_points_positive = None
+        # Explicit lists of file paths
+        self.input_paths = []  # list of source image file paths
+        self.output_paths = [] # list of corresponding mask save paths
 
     def _get_resource_path(self, relative_path: str) -> str:
         base = getattr(sys, 'frozen', False) and sys._MEIPASS or os.path.abspath('.')
@@ -73,20 +73,21 @@ class MaskDetectorBuilder:
     def set_checkpoint(self, p: str): self._cfg.checkpoint_path = p; return self
     def set_display(self, flag: bool): self._cfg.is_display = flag; return self
     def set_downscale(self, f: float): self._cfg.downscale_factor = f; return self
-    def set_extensions(self, exts: tuple): self._cfg.image_extensions = exts; return self
-    def set_source(self, path: str): self._cfg.folderpath_source = path; return self
-    def set_save(self, path: str): self._cfg.folderpath_save = path; return self
     def set_positive_points(self, n: int): self._cfg.num_positive_points = n; return self
     def set_negative_points(self, n: int): self._cfg.num_negative_points = n; return self
-    def set_roi(self, flag: bool): self._cfg.is_roi = flag; return self
-    def set_box_roi(self, box: tuple): self._cfg.box_roi = box; return self
-    def set_init_points(self, pts: np.ndarray): self._cfg.init_points_positive = pts; return self
-    # New setters
     def set_erode_size(self, size: int): self._cfg.erode_size = size; return self
     def set_kmeans_n_init(self, n: int): self._cfg.kmeans_n_init = n; return self
     def set_kmeans_random_state(self, r: int): self._cfg.kmeans_random_state = r; return self
+    def set_roi(self, flag: bool): self._cfg.is_roi = flag; return self
+    def set_box_roi(self, box: tuple): self._cfg.box_roi = box; return self
+    def set_init_points(self, pts: np.ndarray): self._cfg.init_points_positive = pts; return self
+    def set_input_paths(self, paths: list[str]): self._cfg.input_paths = paths; return self
+    def set_output_paths(self, paths: list[str]): self._cfg.output_paths = paths; return self
 
     def build(self) -> 'MaskDetector':
+        # Ensure input and output lists align
+        if len(self._cfg.output_paths) and len(self._cfg.input_paths) != len(self._cfg.output_paths):
+            raise ValueError("Input and output paths lists must have the same length")
         return MaskDetector(self._cfg)
 
 
@@ -104,7 +105,6 @@ class MaskVisualizer:
         color_mask = np.zeros_like(image)
         color_mask[mask == 255] = [0, 255, 0]
         vis = cv2.addWeighted(vis, 1, color_mask, alpha, 0)
-        # Avoid ambiguous truth value by explicit None check
         if pos is not None:
             for pt in pos:
                 cv2.circle(vis, tuple(pt), radius, (0, 255, 0), thickness)
@@ -126,6 +126,7 @@ class MaskVisualizer:
             cv2.waitKey(wait_ms)
             cv2.destroyAllWindows()
 
+
 class ImageProcessingState:
     def __init__(self,
                  pos: np.ndarray = None,
@@ -140,10 +141,7 @@ class ImageProcessingState:
 
 class MaskDetector:
     """Main class coordinating mask detection pipeline."""
-    def __init__(self, cfg: MaskDetectorConfig = None):
-        # if no config is provided, use default
-        if cfg is None:
-            cfg = MaskDetectorConfig()
+    def __init__(self, cfg: MaskDetectorConfig):
         self.cfg = cfg
         self.logger = global_logger
         try:
@@ -154,61 +152,45 @@ class MaskDetector:
             raise
 
     def process_images(self) -> None:
-        try:
-            paths = ImagePathUtility.get_image_paths(self.cfg.folderpath_source,
-                                                     self.cfg.image_extensions)
-        except Exception as e:
-            self.logger.error('Error fetching image paths: %s', e)
-            return
-        os.makedirs(self.cfg.folderpath_save, exist_ok=True)
-
-        # Initial setup
-        try:
-            first = ImageProcessor.load_image(paths[0])
-            first = ImageProcessor.rescale(first, 1/self.cfg.downscale_factor)
-        except Exception as e:
-            self.logger.error('Cannot load first image: %s', e)
-            return
-
-        if self.cfg.is_roi and not self.cfg.box_roi:
-            self.cfg.box_roi = self._choose_roi_box()
-        if self.cfg.box_roi:
-            first = ImageProcessor.crop_image(first, self.cfg.box_roi)
-
-        if self.cfg.init_points_positive is None:
-            if not self.cfg.is_display:
-                self.logger.error('Headless mode requires init_points_positive')
-                return
-            self.logger.info('Select %d positive points', self.cfg.num_positive_points)
-            pts = get_click_coordinates(cv2.cvtColor(first, cv2.COLOR_RGB2BGR))
-        else:
-            pts = self.cfg.init_points_positive
-
-        state = ImageProcessingState(pos=pts)
-
-        for path in tqdm(paths, desc='Processing'):
+        # Iterate explicit input/output pairs
+        for src, dst in tqdm(zip(self.cfg.input_paths, self.cfg.output_paths or []),
+                             desc='Processing'):
             try:
-                img = ImageProcessor.load_image(path)
+                img = ImageProcessor.load_image(src)
                 img = ImageProcessor.rescale(img, 1/self.cfg.downscale_factor)
-                if self.cfg.box_roi:
+                if self.cfg.is_roi and (self.cfg.box_roi is not None):
+                    self.logger.info('Cropping image to ROI: %s', self.cfg.box_roi)
                     img_proc = ImageProcessor.crop_image(img, self.cfg.box_roi)
                 else:
                     img_proc = img
 
-                state = self.process_single_image(img_proc, state)
-                # Prepare output mask
+                # Initial selection only for first image
+                if not hasattr(self, '_state'):
+                    if self.cfg.init_points_positive is None:
+                        if not self.cfg.is_display:
+                            self.logger.error('Headless mode requires init_points_positive')
+                            return
+                        self.logger.info('Select %d positive points', self.cfg.num_positive_points)
+                        pts = get_click_coordinates(cv2.cvtColor(img_proc, cv2.COLOR_RGB2BGR))
+                    else:
+                        pts = self.cfg.init_points_positive
+                    self._state = ImageProcessingState(pos=pts)
+
+                self._state = self.process_single_image(img_proc, self._state)
+
+                # Prepare final mask
                 if self.cfg.box_roi:
                     full = np.zeros(img.shape[:2], dtype=np.uint8)
-                    x,y,w,h = self.cfg.box_roi
-                    full[y:y+h, x:x+w] = state.mask_current
+                    x, y, w, h = self.cfg.box_roi
+                    full[y:y+h, x:x+w] = self._state.mask_current
                     out_mask = full
                 else:
-                    out_mask = state.mask_current
+                    out_mask = self._state.mask_current
 
-                out_path = self._get_save_path(path)
-                ImagePathUtility.save_mask_as_image(out_mask, out_path)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                ImageProcessor.save_mask_as_image(out_mask, dst)
             except Exception as e:
-                self.logger.error('Error in processing %s: %s', path, e)
+                self.logger.error('Error in processing %s: %s', src, e)
                 continue
 
     def process_single_image(self,
@@ -235,26 +217,14 @@ class MaskDetector:
         eroded = ImageProcessor.erode_mask(state.mask_current,
                                           self.cfg.erode_size)
         inv = ImageProcessor.invert_mask(state.mask_current)
-        state.points_positive = distribute_points(eroded,
-                                                 self.cfg.num_positive_points,
-                                                 n_init=self.cfg.kmeans_n_init,
-                                                 random_state=self.cfg.kmeans_random_state)
-        state.points_negative = distribute_points(inv,
-                                                 self.cfg.num_negative_points,
-                                                 n_init=self.cfg.kmeans_n_init,
-                                                 random_state=self.cfg.kmeans_random_state)
+        state.points_positive = distribute_points(
+            eroded,
+            self.cfg.num_positive_points,
+            n_init=self.cfg.kmeans_n_init,
+            random_state=self.cfg.kmeans_random_state)
+        state.points_negative = distribute_points(
+            inv,
+            self.cfg.num_negative_points,
+            n_init=self.cfg.kmeans_n_init,
+            random_state=self.cfg.kmeans_random_state)
         return state
-
-    def _get_save_path(self, img_path: str) -> str:
-        _, fn = os.path.split(img_path)
-        name, ext = os.path.splitext(fn)
-        return os.path.join(self.cfg.folderpath_save, f"{name}_mask{ext}")
-
-    def _choose_roi_box(self) -> tuple:
-        paths = ImagePathUtility.get_image_paths(self.cfg.folderpath_source,
-                                                 self.cfg.image_extensions)
-        img = ImageProcessor.load_image(paths[0])
-        img = ImageProcessor.rescale(img, 1/self.cfg.downscale_factor)
-        box = cv2.selectROI("Choose ROI", img, fromCenter=False, showCrosshair=True)
-        cv2.destroyAllWindows()
-        return box

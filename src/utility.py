@@ -80,7 +80,7 @@ def distribute_points_using_kmeans(mask, num_points):
 class ImagePathUtility:
     """Utility class for handling image paths and saving masks as images."""
     @staticmethod
-    def get_image_paths(input_dir: str, image_extensions: list) -> list:
+    def get_image_paths(input_dir: str, image_extensions: tuple = (".jpg", ".jpeg", ".png", ".tiff", ".bmp")) -> list:
         """
         Retrieves image paths from the specified directory given the supported extensions.
         
