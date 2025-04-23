@@ -144,7 +144,7 @@ class BatchProcessor:
                 print(f"Folder {config.folderpath_source} already processed.")
                 continue
 
-            detector = MaskDetector(config=config)
+            detector = MaskDetector(cfg=config)
             detector.process_images()
             print(f"Folder {config.folderpath_source} processed.")
 

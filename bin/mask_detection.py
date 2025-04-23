@@ -20,12 +20,17 @@ def transform_source_path_to_save_path(path_source: str) -> str:
     return path_source.replace("Materials", "Results")
 
 if __name__ == "__main__":
-    builder = MaskDetectorBuilder()
-    builder.folderpath_source = r".\Materials\250um brain\skrawek 2"
-    builder.folderpath_save = transform_source_path_to_save_path(builder.folderpath_source)
-    builder.num_negative_points = 20
-    builder.is_display = True
-    builder.is_roi = True
+    source_path = r".\Materials\250um brain\skrawek 1"
+    save_path = transform_source_path_to_save_path(source_path)
+
+    builder = (
+        MaskDetectorBuilder()
+        .set_source(source_path)
+        .set_save(save_path)
+        .set_negative_points(20)
+        .set_display(True)
+        .set_roi(True)
+    )
 
     detector = builder.build()
     detector.process_images()

@@ -64,14 +64,17 @@ def run_gui():
             print(f"  {k}: {v}")
 
         # Configure builder based on parameters
-        builder = MaskDetectorBuilder()
-        builder.folderpath_source = params["folderpath_source"]
-        builder.folderpath_save = params["folderpath_save"]
-        builder.num_negative_points = params["num_negative_points"]
-        builder.is_display = params["is_display"]
-        builder.is_roi = params["is_roi"]
-        builder.downscale_factor = params["downscale_factor"]  # processing scale
-
+        builder = (
+            MaskDetectorBuilder()
+            .set_source(params["folderpath_source"])
+            .set_save(params["folderpath_save"])
+            .set_positive_points(params["num_positive_points"])
+            .set_negative_points(params["num_negative_points"])
+            .set_display(params["is_display"])
+            .set_roi(params["is_roi"])
+            .set_downscale(params["downscale_factor"])
+            )
+            
         # Create detector and process images
         detector = builder.build()
         detector.process_images()
