@@ -63,34 +63,6 @@ class MaskDetectorConfig:
         base = getattr(sys, 'frozen', False) and sys._MEIPASS or os.path.abspath('.')
         return os.path.join(base, relative_path)
 
-
-class MaskDetectorBuilder:
-    """Builder for MaskDetectorConfig"""
-    def __init__(self):
-        self._cfg = MaskDetectorConfig()
-
-    def set_model_type(self, t: str): self._cfg.model_type = t; return self
-    def set_checkpoint(self, p: str): self._cfg.checkpoint_path = p; return self
-    def set_display(self, flag: bool): self._cfg.is_display = flag; return self
-    def set_downscale(self, f: float): self._cfg.downscale_factor = f; return self
-    def set_positive_points(self, n: int): self._cfg.num_positive_points = n; return self
-    def set_negative_points(self, n: int): self._cfg.num_negative_points = n; return self
-    def set_erode_size(self, size: int): self._cfg.erode_size = size; return self
-    def set_kmeans_n_init(self, n: int): self._cfg.kmeans_n_init = n; return self
-    def set_kmeans_random_state(self, r: int): self._cfg.kmeans_random_state = r; return self
-    def set_roi(self, flag: bool): self._cfg.is_roi = flag; return self
-    def set_box_roi(self, box: tuple): self._cfg.box_roi = box; return self
-    def set_init_points(self, pts: np.ndarray): self._cfg.init_points_positive = pts; return self
-    def set_input_paths(self, paths: list[str]): self._cfg.input_paths = paths; return self
-    def set_output_paths(self, paths: list[str]): self._cfg.output_paths = paths; return self
-
-    def build(self) -> 'MaskDetector':
-        # Ensure input and output lists align
-        if len(self._cfg.output_paths) and len(self._cfg.input_paths) != len(self._cfg.output_paths):
-            raise ValueError("Input and output paths lists must have the same length")
-        return MaskDetector(self._cfg)
-
-
 class MaskVisualizer:
     """Handles mask overlay visualization."""
     @staticmethod

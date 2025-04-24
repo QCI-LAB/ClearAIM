@@ -105,7 +105,6 @@ class BatchProcessor:
 
             config = MaskDetectorConfig()
             config.folderpath_source = str(folder)
-            # Create a result folder analogous to the structure from source_folder
             relative_path = Path(folder).relative_to(self.source_folder)
             config.folderpath_save = str(self.results_base / relative_path)
             config.num_negative_points = 20
