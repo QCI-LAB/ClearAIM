@@ -9,7 +9,8 @@ script_dir = Path(__file__).parent.resolve()
 project_root = script_dir.parent.resolve()
 sys.path.insert(0, str(project_root))
 
-from src.mask_detector import MaskDetectorBuilder  # main builder for detection
+from src.mask_detector import MaskDetectorConfig, MaskDetector
+from src.utility import ImagePathUtility, get_roi_box
 
 # Set High DPI awareness on Windows (2 = PER_MONITOR_DPI_AWARE)
 if sys.platform.startswith('win'):
@@ -64,19 +65,19 @@ def run_gui():
             print(f"  {k}: {v}")
 
         # Configure builder based on parameters
-        builder = (
-            MaskDetectorBuilder()
-            .set_source(params["folderpath_source"])
-            .set_save(params["folderpath_save"])
-            .set_positive_points(params["num_positive_points"])
-            .set_negative_points(params["num_negative_points"])
-            .set_display(params["is_display"])
-            .set_roi(params["is_roi"])
-            .set_downscale(params["downscale_factor"])
-            )
-            
-        # Create detector and process images
-        detector = builder.build()
+        config = MaskDetectorConfig()
+        config.input_paths = [Path(params["folderpath_source"]) / f for f in ImagePathUtility.get_image_paths(params["folderpath_source"])]
+        config.output_paths = [Path(params["folderpath_save"]) / (f.stem + "_mask.png") for f in config.input_paths]
+        config.num_positive_points = params["num_positive_points"]
+        config.num_negative_points = params["num_negative_points"]
+        config.is_display = params["is_display"]
+        config.downscale_factor = params["downscale_factor"]
+
+        if params["is_roi"]:
+            # Get ROI box from the first image
+            config.box_roi = get_roi_box(config.input_paths[0], config.downscale_factor)
+
+        detector = MaskDetector(config)
         detector.process_images()
 
         print("Mask detection complete.")

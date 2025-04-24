@@ -7,7 +7,7 @@ project_root = script_dir.parent.resolve()
 sys.path.insert(0, str(project_root))
 
 from src.mask_detector import MaskDetectorConfig, MaskDetector
-from src.utility import ImagePathUtility
+from src.utility import ImagePathUtility, get_roi_box
 
 def transform_source_path_to_save_path(path_source: str) -> str:
     """
@@ -19,6 +19,7 @@ def transform_source_path_to_save_path(path_source: str) -> str:
         str: The transformed file path with "Materials" replaced by "Results".
     """
     return path_source.replace("Materials", "Results")
+
 
 if __name__ == "__main__":
     source_path = r".\Materials\250um brain\skrawek 1"
@@ -32,9 +33,10 @@ if __name__ == "__main__":
     config.output_paths = save_paths
     config.num_negative_points = 20
     config.num_positive_points = 2
-    config.is_display = True
-    config.is_roi = True
+    config.is_display = False
     config.downscale_factor = 2.0
+    
+    config.box_roi = get_roi_box(config.input_paths[0], config.downscale_factor)
 
     detector = MaskDetector(config)
     detector.process_images()

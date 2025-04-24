@@ -10,8 +10,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.mask_detector import MaskDetectorConfig, ImageProcessor, get_click_coordinates
-from src.mask_detector import MaskDetector
+from src.mask_detector import MaskDetector, MaskDetectorConfig, ImageProcessor, get_click_coordinates
+from src.utility import get_roi_box, ImagePathUtility
 
 class BatchProcessor:
     def __init__(self, source_folder, ignore, csv_path):
@@ -58,7 +58,7 @@ class BatchProcessor:
         
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         data = {
-            "Folder Name": [Path(path).name for path in deepest_folders],
+            "Folder Name": [path for path in deepest_folders],
             "Processed": ["No"] * len(deepest_folders),
             "Date": [current_time] * len(deepest_folders)
         }
@@ -91,7 +91,7 @@ class BatchProcessor:
         configs = []
         for folder in deepest_folders:
             
-            if df[df['Folder Name'] == Path(folder).name]['Processed'].values[0] == "Yes":
+            if df[df['Folder Name'] == folder]['Processed'].values[0] == "Yes":
                 print(f"Folder {folder} already processed. Skipping.")
                 continue
     
@@ -100,57 +100,55 @@ class BatchProcessor:
                 print(f"Folder {folder} is empty. Skipping.")
                 continue
 
-            paths_image = list(folder.rglob('*.jpg')) + list(folder.rglob('*.png'))
-            paths_image = [str(path) for path in paths_image]
+            input_paths = ImagePathUtility.get_image_paths(folder)
+
+            # build save_paths by replacing source_folder with results_base and appending "_mask"
+            save_paths = []
+            for img_path in input_paths:
+                rel = Path(img_path).relative_to(self.source_folder)
+                mask_name = rel.stem + "_mask.png"
+                out_file = self.results_base / rel.parent / mask_name
+                out_file.parent.mkdir(parents=True, exist_ok=True)
+                save_paths.append(out_file)
 
             config = MaskDetectorConfig()
-            config.folderpath_source = str(folder)
-            relative_path = Path(folder).relative_to(self.source_folder)
-            config.folderpath_save = str(self.results_base / relative_path)
+            config.input_paths = input_paths
+            config.output_paths = save_paths
             config.num_negative_points = 20
+            config.num_positive_points = 2
             config.is_display = False
-            config.is_roi = False
             config.downscale_factor = 3.0
 
-            # Initialization from the first image
-            first_image = ImageProcessor.load_image(paths_image[0])
+            config.box_roi = get_roi_box(input_paths[0], config.downscale_factor)
+
+            first_image = ImageProcessor.load_image(input_paths[0])
             first_image = ImageProcessor.rescale(first_image, 1/config.downscale_factor)
-
-            # ROI selection
-            cv2.namedWindow("Select ROI", cv2.WINDOW_NORMAL)
-            cv2.setWindowProperty("Select ROI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            cv2.imshow("Select ROI", first_image)
-            cv2.waitKey(1)
-            box_roi = cv2.selectROI("Select ROI", first_image, False, False)
-            cv2.destroyWindow("Select ROI")
-            config.box_roi = box_roi
-
             first_image = ImageProcessor.crop_image(first_image, config.box_roi)
-
             print(f"Select {config.num_positive_points} positive points on the image")
             init_points_positive = get_click_coordinates(
                 cv2.cvtColor(first_image, cv2.COLOR_RGB2BGR),
                 config.num_positive_points
             )
             config.init_points_positive = init_points_positive
+            
             configs.append(config)
 
         # Load data from CSV
         df = pd.read_csv(self.csv_path)
         for config in configs:
-            folder_name = Path(config.folderpath_source).name
+            folder_name = str(Path(config.input_paths[0]).parent)
             if df[df['Folder Name'] == folder_name]['Processed'].values[0] == "Yes":
-                print(f"Folder {config.folderpath_source} already processed.")
+                print(f"Folder {folder_name} already processed.")
                 continue
 
             detector = MaskDetector(cfg=config)
             detector.process_images()
-            print(f"Folder {config.folderpath_source} processed.")
+            print(f"Folder {folder_name} processed.")
 
             # Update status in CSV file
             df.loc[df['Folder Name'] == folder_name, 'Processed'] = "Yes"
             df.to_csv(self.csv_path, index=False)
-            print(f"Processing status of folder {config.folderpath_source} updated in CSV file.")
+            print(f"Processing status of folder {folder_name} updated in CSV file.")
 
     def run(self):
         deepest = self.find_deepest_subfolders()

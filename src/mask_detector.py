@@ -50,12 +50,8 @@ class MaskDetectorConfig:
         self.erode_size = 5
         self.kmeans_n_init = 10
         self.kmeans_random_state = 0
-        # Region of interest
-        self.is_roi = False
         self.box_roi = None
-        # Initial manual points
         self.init_points_positive = None
-        # Explicit lists of file paths
         self.input_paths = []  # list of source image file paths
         self.output_paths = [] # list of corresponding mask save paths
 
@@ -126,12 +122,11 @@ class MaskDetector:
     def process_images(self) -> None:
         # Iterate explicit input/output pairs
         for src, dst in tqdm(zip(self.cfg.input_paths, self.cfg.output_paths or []),
-                             desc='Processing'):
+                     desc='Processing', total=len(self.cfg.input_paths)):
             try:
                 img = ImageProcessor.load_image(src)
                 img = ImageProcessor.rescale(img, 1/self.cfg.downscale_factor)
-                if self.cfg.is_roi and (self.cfg.box_roi is not None):
-                    self.logger.info('Cropping image to ROI: %s', self.cfg.box_roi)
+                if self.cfg.box_roi is not None:
                     img_proc = ImageProcessor.crop_image(img, self.cfg.box_roi)
                 else:
                     img_proc = img
@@ -139,9 +134,6 @@ class MaskDetector:
                 # Initial selection only for first image
                 if not hasattr(self, '_state'):
                     if self.cfg.init_points_positive is None:
-                        if not self.cfg.is_display:
-                            self.logger.error('Headless mode requires init_points_positive')
-                            return
                         self.logger.info('Select %d positive points', self.cfg.num_positive_points)
                         pts = get_click_coordinates(cv2.cvtColor(img_proc, cv2.COLOR_RGB2BGR))
                     else:

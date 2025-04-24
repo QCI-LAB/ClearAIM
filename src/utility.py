@@ -99,18 +99,6 @@ class ImagePathUtility:
         print(f"Found {len(image_paths)} images in {input_dir}")
         return image_paths
 
-    @staticmethod
-    def save_mask_as_image(mask: np.ndarray, output_path: str) -> None:
-        """
-        Saves the binary mask as an image at the given path.
-        
-        :param mask: Binary mask (numpy array).
-        :param output_path: Path to the output file.
-        """
-        mask = mask.astype(np.uint8) * 255
-        cv2.imwrite(output_path, mask)
-        print(f"Saved mask to {output_path}")
-
 class ImageProcessor:
     """Utility class for image processing operations."""
     @staticmethod
@@ -190,3 +178,34 @@ class ImageProcessor:
         """
         x, y, w, h = box
         return image[y:y+h, x:x+w]
+    
+    @staticmethod
+    def save_mask_as_image(mask: np.ndarray, output_path: str) -> None:
+        """
+        Saves the binary mask as an image at the given path.
+        
+        :param mask: Binary mask (numpy array).
+        :param output_path: Path to the output file.
+        """
+        mask = mask.astype(np.uint8) * 255
+        cv2.imwrite(output_path, mask)
+        print(f"Saved mask to {output_path}")
+
+def get_roi_box(image_path: str, downscale_factor: float) -> tuple:
+    """
+    Gets the region of interest (ROI) box for the image.
+    
+    :param image_path: Path to the image file.
+    :param downscale_factor: Factor to downscale the image.
+    :return: ROI box as (x, y, w, h).
+    """
+    image = ImageProcessor.load_image(image_path)
+    # Use rescale from Image Processor to downscale the image then get the ROI using cv2
+    image = ImageProcessor.rescale(image, 1/downscale_factor)
+    cv2.namedWindow("Select ROI", cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty("Select ROI", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    cv2.imshow("Select ROI", image)
+    cv2.waitKey(1)
+    box_roi = cv2.selectROI("Select ROI", image, False, False)
+    cv2.destroyWindow("Select ROI")
+    return box_roi
