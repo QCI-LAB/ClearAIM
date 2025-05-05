@@ -1,52 +1,128 @@
+%% Analyze single folder
 clc; clear; close all;
+addpath(genpath(".\"));
 
-addpath(genpath("./"));
+folderpath_images = ".\Materials\CUBIC\kidney\250um\skrawki 2-5";
+folderpath_masks = ".\Materials\results_mask\kidney\250um\skrawki 2-5";
+analyzeFolderPair(folderpath_images, ...
+                  folderpath_masks);
+%% Analyze all folders in a path
+clc; clear; close all;
+addpath(genpath("."));
 
-path_images = "./Materials/250um brain/skrawek 1";
-path_masks = "./results_mask/250um brain/skrawek 1";
-filename_save = '250um brain skrawek 1';
+% === SETTINGS ===
+root_images_dir = '.\Materials\CUBIC';
+root_masks_dir  = '.\Materials\results_mask';
+excluded_folders = {'odrzucone'};  % Folders to exclude
 
-paths_pairs = findImageMaskPairs(path_images, path_masks);
-paths_pairs = sort_image_mask_struct(paths_pairs);
+% === FIND DEEPEST FOLDERS ===
+image_dirs = findDeepestDirs(root_images_dir, excluded_folders);
+mask_dirs  = findDeepestDirs(root_masks_dir,  excluded_folders);
 
-%paths_pairs = paths_pairs(1:100); %TEMP
+% === MATCH AND ANALYZE ===
+for i = 1:length(image_dirs)
+    img_path = image_dirs{i};
+    best_match = '';
+    best_score = 0;
 
-%displayImagesWithMasks(paths_pairs)
-%% Calculate and Display Sample Measurements
-RADIUS_DILAT = 20;
+    for j = 1:length(mask_dirs)
+        mask_path = mask_dirs{j};
+        score = countMatchingPathEnd(img_path, mask_path);
+        if score > best_score
+            best_score = score;
+            best_match = mask_path;
+        end
+    end
 
-metrics_array = calcMetricsOfAllImages(paths_pairs, RADIUS_DILAT);
-%%
-image_extensions = {'*.png','*.jpg','*.jpeg','*.tiff','*.bmp','*.gif'};
-all_imgs = [];
-for ext = image_extensions
-    all_imgs = [all_imgs; dir(fullfile(path_images, ext{1}))];
+    if best_score > 0
+        fprintf('Processing pair:\n  Image folder: %s\n  Mask folder:  %s\n\n', img_path, best_match);
+        analyzeFolderPair(img_path, best_match);
+    else
+        fprintf('No match found for image folder: %s\n', img_path);
+    end
 end
-all_paths = fullfile(path_images, {all_imgs.name});
 
-baseline = computeBaselineFromMetadata(all_paths);
-times_days_array = getTimeFromMetadatas([paths_pairs.image_path]);
-times_days_array = times_days_array - baseline;
+%% Functions
+function analyzeFolderPair(path_images, path_masks)
+%ANALYZEFOLDERPAIR Processes image and mask folders to compute metrics and create animations.
+%   analyzeFolderPair(path_images, path_masks)
+%   - path_images (string): Folder containing original images.
+%   - path_masks  (string): Folder containing corresponding masks.
+%   Matches images with masks, computes area, contrast, and transmittance metrics,
+%   displays metric plots, and generates an animation saved under a common name.
+%
+%   Example:
+%       % Analyze images in "data/imgs" and masks in "data/masks"
+%       analyzeFolderPair("data/imgs", "data/masks");
+    filename_save = extractCommonName(path_images, path_masks);
 
-displayMetrics(metrics_array, times_days_array)
+    paths_pairs = findImageMaskPairs(path_images, path_masks);
+    paths_pairs = sort_image_mask_struct(paths_pairs);
 
-%% Making animation from data
-createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_array, times_days_array)
+    RADIUS_DILAT = 20;
 
+    metrics_array = calcMetricsOfAllImages(paths_pairs, RADIUS_DILAT);
+
+    image_extensions = {'*.png','*.jpg','*.jpeg','*.tiff','*.bmp','*.gif'};
+    all_imgs = [];
+    for ext = image_extensions
+        all_imgs = [all_imgs; dir(fullfile(path_images, ext{1}))];
+    end
+    all_paths = fullfile(path_images, {all_imgs.name});
+
+
+    baseline = computeBaselineFromMetadata(all_paths);
+    times_days_array = getTimeFromMetadatas(string({paths_pairs.image_path}));
+    times_days_array = times_days_array - baseline;
+
+    displayMetrics(metrics_array, times_days_array);
+
+    createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_array, times_days_array);
+end
+
+function common_name = extractCommonName(path1, path2)
+%EXTRACTCOMMONNAME Generates a common name from two file or folder paths.
+%   common_name = extractCommonName(path1, path2)
+%   - path1, path2 (string): Paths to compare.
+%   Finds the longest shared trailing segments or concatenates base names if none match.
+%
+%   Example:
+%       % Should return "session1"
+%       common_name = extractCommonName("C:/proj/session1/imgs", "C:/proj/session1/masks");
+
+    s1 = fliplr(strsplit(path1, filesep));
+    s2 = fliplr(strsplit(path2, filesep));
+    n = min(length(s1), length(s2));
+    common_parts = {};
+    for i = 1:n
+        if strcmp(s1{i}, s2{i})
+            common_parts{end+1} = s1{i};  % dodaj do końca
+        else
+            break;
+        end
+    end
+    if isempty(common_parts)
+        [~, name1] = fileparts(path1);
+        [~, name2] = fileparts(path2);
+        common_name = [name1, '_', name2];
+    else
+        common_parts = fliplr(common_parts);  % przywróć oryginalną kolejność
+        common_name = strjoin(common_parts, ' ');
+    end
+end
 
 function file_pairs = findImageMaskPairs(folder_images, folder_masks, mask_suffix)
-    % Retrieves pairs of image and corresponding mask files from specified folders
-    %
-    % Parameters:
-    %    folder_images (string): Path to the folder containing image files
-    %    folder_masks (string): Path to the folder containing mask files
-    %    mask_suffix (string): Suffix to identify mask files (e.g., '_mask')
-    %
-    % Returns:
-    %    file_pairs (struct): Structure containing pairs of image and mask paths
-    %
-    % Example:
-    %    file_pairs = findImageMaskPairs('images_folder', 'masks_folder', '_mask');
+%FINDIMAGEMASKPAIRS Retrieves matched image and mask file pairs.
+%   file_pairs = findImageMaskPairs(folder_images, folder_masks, mask_suffix)
+%   - folder_images (string): Path to image folder.
+%   - folder_masks  (string): Path to mask folder.
+%   - mask_suffix   (string, optional): Suffix identifying mask filenames (default '_mask').
+%   Returns struct array with fields:
+%       .image_path
+%       .mask_path
+%
+%   Example:
+%       pairs = findImageMaskPairs("imgs", "masks", "_seg");
 
     % Set default mask suffix if not provided
     if nargin < 3
@@ -107,21 +183,16 @@ function file_pairs = findImageMaskPairs(folder_images, folder_masks, mask_suffi
     end
 end
 
-
 function binary_mask = processMask(mask, target_size)
-    %PROCESSMASK Processes the input mask by converting it to grayscale,
-    % resizing it to the target size, and binarizing it.
-    %
-    % binary_mask = PROCESSMASK(mask, target_size) takes the input mask and
-    % processes it by converting it to grayscale (if needed), resizing it to the
-    % specified target_size, and binarizing the result.
-    %
-    % Inputs:
-    %   mask - The input mask image.
-    %   target_size - The desired size for the output mask [rows, cols].
-    %
-    % Outputs:
-    %   binary_mask - The processed binary mask.
+%PROCESSMASK Processes and binarizes a mask image.
+%   binary_mask = processMask(mask, target_size)
+%   - mask        (matrix): Input mask image (grayscale or RGB).
+%   - target_size (1×2 vector): Desired output size [rows, cols].
+%   Converts to grayscale if needed, resizes, then binarizes.
+%
+%   Example:
+%       img = imread("mask.png");
+%       bin = processMask(img, [256,256]);
 
     % If the mask is color, convert it to grayscale
     if size(mask, 3) == 3
@@ -136,19 +207,15 @@ function binary_mask = processMask(mask, target_size)
 end
 
 function displayImageWithMaskContour(image_path, mask_path)
-    % displayImageWithMaskContour Displays an image with overlaid mask contours
-    %
-    % This function loads an original image and a corresponding mask, processes
-    % the mask to create a binary version, finds the contours of the mask, and
-    % displays the original image with the mask contours overlaid in red.
-    %
-    % Parameters:
-    %    image_path (string): Path to the image file
-    %    mask_path (string): Path to the mask file
-    %
-    % Example:
-    %    displayImageWithMaskContour('image.jpg', 'mask.png');
-    
+%DISPLAYIMAGEWITHMASKCONTOUR Shows image with mask boundary overlay.
+%   displayImageWithMaskContour(image_path, mask_path)
+%   - image_path (string): Path to the image file.
+%   - mask_path  (string): Path to the mask file.
+%   Loads image and mask, processes the mask, finds contours, and overlays them.
+%
+%   Example:
+%       displayImageWithMaskContour("img.jpg", "img_mask.png");
+
     % Load the original image
     original_image = imread(image_path);
     
@@ -172,45 +239,25 @@ function displayImageWithMaskContour(image_path, mask_path)
 end
 
 function C = weberContrast(I_sample, I_background)
-    %WEBER_CONTRAST Calculates the Weber contrast between a sample and the background
-    %
-    % C = WEBER_CONTRAST(I_sample, I_background) computes the Weber contrast (C) for a given
-    % sample intensity (I_sample) and background intensity (I_background). 
-    %
-    % The Weber contrast is defined as:
-    % C = (I_sample - I_background) / I_background
-    %
-    % This measure is useful when the background intensity is uniform and the sample's
-    % intensity varies slightly from the background.
-    %
-    % Inputs:
-    %   I_sample - Intensity of the sample (scalar or array).
-    %   I_background - Intensity of the background (scalar or array of the same size as I_sample).
-    %
-    % Outputs:
-    %   C - The computed Weber contrast (scalar or array).
-    %
-    % Example:
-    %   I_sample = 150;
-    %   I_background = 100;
-    %   C = weber_contrast(I_sample, I_background);
-    %   disp(C);  % Outputs: 0.5
-    
+%   C = weberContrast(I_sample, I_background)
+%   - I_sample     (numeric): Sample intensity(s).
+%   - I_background (numeric): Background intensity(s).
+%   Returns C = (I_sample - I_background) ./ I_background.
+%
+%   Example:
+%       c = weberContrast(150,100);  % c == 0.5
+
     C = (I_sample - I_background) ./ I_background;
 end
 
 function sortedStruct = sort_image_mask_struct(inputStruct)
-    %SORT_IMAGE_MASK_STRUCT Sorts a structure array based on the numerical values in the image_path field.
-    %
-    % sortedStruct = SORT_IMAGE_MASK_STRUCT(inputStruct) takes a structure array with fields
-    % image_path and mask_path and sorts it according to the numerical values extracted from
-    % the image_path field.
-    %
-    % Inputs:
-    %   inputStruct - A structure array with fields 'image_path' and 'mask_path'.
-    %
-    % Outputs:
-    %   sortedStruct - A structure array sorted based on the numerical values in the image_path.
+%SORT_IMAGE_MASK_STRUCT Sorts image-mask pairs by numeric suffix in image filenames.
+%   sortedStruct = sort_image_mask_struct(inputStruct)
+%   - inputStruct (struct array): Fields .image_path, .mask_path.
+%   Returns the struct array sorted on the numeric token extracted from .image_path.
+%
+%   Example:
+%       s = sort_image_mask_struct(pairs);  % orders by number in "img_001.png"
 
     % Extract image paths
     imagePaths = {inputStruct.image_path};
@@ -234,8 +281,15 @@ function sortedStruct = sort_image_mask_struct(inputStruct)
     sortedStruct = inputStruct(sortIdx);  % Reorder structure based on sorted indices
 end
 
-
 function displayImagesWithMasks(paths_pairs)
+%DISPLAYIMAGESWITHMASKS Iteratively displays images with mask contours and progress.
+%   displayImagesWithMasks(paths_pairs)
+%   - paths_pairs (struct array): Fields .image_path, .mask_path.
+%   Displays each image with overlaid contours and a progress title.
+%
+%   Example:
+%       displayImagesWithMasks(pairs);
+
     for ind = 1 : length(paths_pairs)
         path_img = paths_pairs(ind).image_path;
         path_mask = paths_pairs(ind).mask_path;
@@ -249,6 +303,21 @@ function displayImagesWithMasks(paths_pairs)
 end
 
 function metrics = calcMetricsFromImageAndMask(img_origin, img_mask, radius_dilat)
+%CALCMETRICSFROMIMAGEANDMASK Calculates metrics for a single image and mask.
+%   metrics = calcMetricsFromImageAndMask(img_origin, img_mask, radius_dilat)
+%   - img_origin   (matrix): Original image.
+%   - img_mask     (logical matrix): Binary object mask.
+%   - radius_dilat (integer): Dilation radius for background.
+%   Returns struct with fields:
+%       .web_contrast
+%       .area
+%       .transmittance
+%
+%   Example:
+%       I = imread("img.png");
+%       M = processMask(imread("mask.png"), size(I));
+%       m = calcMetricsFromImageAndMask(I, M, 10);
+
     mean_value_object = mean(img_origin(img_mask(:)));
     mask_background = bwmorph(img_mask, 'dilate', radius_dilat) & ~img_mask;
     mean_value_background = mean(img_origin(mask_background(:)));
@@ -260,10 +329,26 @@ function metrics = calcMetricsFromImageAndMask(img_origin, img_mask, radius_dila
 end
 
 function struct_metrics = initializeStructureForMetrics(num_of_elements)
+%INITIALIZESTRUCTUREFORMETRICS Preallocates metric struct array.
+%   struct_metrics = initializeStructureForMetrics(num_of_elements)
+%   - num_of_elements (integer): Number of entries.
+%   Returns struct array with empty fields .web_contrast, .area, .transmittance.
+%
+%   Example:
+%       arr = initializeStructureForMetrics(5);
+
     struct_metrics(num_of_elements) = struct('web_contrast', [], 'area', [], 'transmittance', []);
 end
 
 function metrics_array = calcMetricsOfAllImages(paths_pairs, radius_dilate)
+%CALCMETRICSOFALLIMAGES Computes metrics over all image–mask pairs.
+%   metrics_array = calcMetricsOfAllImages(paths_pairs, radius_dilate)
+%   - paths_pairs   (struct array): Fields .image_path, .mask_path.
+%   - radius_dilate (integer): Dilation radius for background.
+%   Returns an array of metric structs, one per pair.
+%
+%   Example:
+%       metrics = calcMetricsOfAllImages(pairs, 15);
 
     metrics_array = initializeStructureForMetrics(length(paths_pairs));
 
@@ -279,6 +364,16 @@ function metrics_array = calcMetricsOfAllImages(paths_pairs, radius_dilate)
 end
 
 function displayMetrics(metrics_array, time_x)
+%DISPLAYMETRICS Plots area, contrast, and transmittance over time.
+%   displayMetrics(metrics_array, time_x)
+%   - metrics_array (struct array): Fields .area, .web_contrast, .transmittance.
+%   - time_x        (numeric vector): Time in days.
+%   Generates a figure with three subplots for normalized area, Weber contrast, and transmittance (%).
+%
+%   Example:
+%       times = [0;1;2];
+%       displayMetrics(metrics, times);
+
     area_array = [metrics_array(:).area];
     web_contrast_array = [metrics_array(:).web_contrast];
     transmittance_array = [metrics_array(:).transmittance];
@@ -317,6 +412,14 @@ end
 
 
 function time = getImageTime(filename)
+%GETIMAGETIME Retrieves timestamp from image metadata.
+%   time = getImageTime(filename)
+%   - filename (string): Path to image file.
+%   Returns date string from EXIF 'DateTimeOriginal' or 'FileModDate', or empty if unavailable.
+%
+%   Example:
+%       t = getImageTime("photo.jpg");
+
     % Function returns the timestamp of the image if available in the EXIF metadata.
     % If the information is not available, it returns an empty array.
     
@@ -339,55 +442,81 @@ function time = getImageTime(filename)
 end
 
 
-function numericTime = getImageTimeAsNumeric(filename)
-    % getImageTimeAsNumeric Extracts and converts image capture time to numeric format.
-    %
-    % Description:
-    %   This function retrieves the capture time from an image file's metadata 
-    %   (EXIF or other metadata fields), and converts it to a numeric format 
-    %   representing the number of days since January 0, 0000 in MATLAB's datenum format.
-    %   This numeric format allows for easy time-based calculations, such as 
-    %   determining time differences between images.
-    %
-    %   Note: The returned value is in days. To calculate the time difference in 
-    %   seconds between two time points, subtract one numeric time from another, 
-    %   then multiply by 24 * 3600 (the number of seconds in a day).
-    %
-    % Input:
-    %   filename - A string specifying the path and name of the image file.
-    %
-    % Output:
-    %   numericTime - A numeric value representing the capture time in days since 
-    %                 January 0, 0000. Returns an error if no time information is found 
-    %                 in the metadata.
-    %
-    % Example:
-    %   timeNum = getImageTimeAsNumeric('image1.jpg');
-    %
-    %   % To calculate the difference in seconds between two images:
-    %   time1 = getImageTimeAsNumeric('image1.jpg');
-    %   time2 = getImageTimeAsNumeric('image2.jpg');
-    %   timeDifferenceInSeconds = (time2 - time1) * 24 * 3600;
-    %
-    % Note:
-    %   This function requires that the `getImageTime` function is available to extract 
-    %   the time as a text string from the image metadata.
+% function numericTime = getImageTimeAsNumeric(filename)
+%     % getImageTimeAsNumeric Extracts and converts image capture time to numeric format.
+%     %
+%     % Description:
+%     %   This function retrieves the capture time from an image file's metadata 
+%     %   (EXIF or other metadata fields), and converts it to a numeric format 
+%     %   representing the number of days since January 0, 0000 in MATLAB's datenum format.
+%     %   This numeric format allows for easy time-based calculations, such as 
+%     %   determining time differences between images.
+%     %
+%     %   Note: The returned value is in days. To calculate the time difference in 
+%     %   seconds between two time points, subtract one numeric time from another, 
+%     %   then multiply by 24 * 3600 (the number of seconds in a day).
+%     %
+%     % Input:
+%     %   filename - A string specifying the path and name of the image file.
+%     %
+%     % Output:
+%     %   numericTime - A numeric value representing the capture time in days since 
+%     %                 January 0, 0000. Returns an error if no time information is found 
+%     %                 in the metadata.
+%     %
+%     % Example:
+%     %   timeNum = getImageTimeAsNumeric('image1.jpg');
+%     %
+%     %   % To calculate the difference in seconds between two images:
+%     %   time1 = getImageTimeAsNumeric('image1.jpg');
+%     %   time2 = getImageTimeAsNumeric('image2.jpg');
+%     %   timeDifferenceInSeconds = (time2 - time1) * 24 * 3600;
+%     %
+%     % Note:
+%     %   This function requires that the `getImageTime` function is available to extract 
+%     %   the time as a text string from the image metadata.
+% 
+%     timeStr = getImageTime(filename);
+% 
+%     if isempty(timeStr)
+%         error('Failed to find time information in the metadata.');
+%     end
+%     try
+%        dateTimeObj = datetime(timeStr, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss');
+%     catch
+%        dateTimeObj = datetime(timeStr, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss', 'Locale','pl-PL');
+%     end
+%     numericTime = datenum(dateTimeObj);
+% end
 
-    timeStr = getImageTime(filename);
-    
-    if isempty(timeStr)
-        error('Failed to find time information in the metadata.');
-    end
+function t = getImageTimeAsNumeric(filename)
+%GETIMAGETIME Retrieves timestamp from image metadata.
+%   time = getImageTime(filename)
+%   - filename (string): Path to image file.
+%   Returns date string from EXIF 'DateTimeOriginal' or 'FileModDate', or empty if unavailable.
+%
+%   Example:
+%       t = getImageTime("photo.jpg");
+
+    [~, name, ~] = fileparts(filename);
+
     try
-       dateTimeObj = datetime(timeStr, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss');
+        t = datenum(name, 'yyyy-mm-dd HH-MM-SS');
     catch
-       dateTimeObj = datetime(timeStr, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss', 'Locale','pl-PL');
+        error('Nieprawidłowy format nazwy pliku: %s', filename);
     end
-    numericTime = datenum(dateTimeObj);
 end
 
+
 function times_array = getTimeFromMetadatas(paths_images)
-    % Zwraca wektor timestampów (w dniach MATLAB‑owych) dla każdej ścieżki
+%GETIMAGETIMEASNUMERIC Extracts numeric time (datenum) from filename.
+%   t = getImageTimeAsNumeric(filename)
+%   - filename (string): File path with name in 'yyyy-mm-dd HH-MM-SS' format.
+%   Parses the timestamp and returns MATLAB datenum; errors if format is invalid.
+%
+%   Example:
+%       dn = getImageTimeAsNumeric("2025-04-01 12-30-00.jpg");
+
     n = numel(paths_images);
     times_array = zeros(n,1);
     for i = 1:n
@@ -396,6 +525,17 @@ function times_array = getTimeFromMetadatas(paths_images)
 end
 
 function createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_array, times_days_array)
+%CREATEANIMATIONOFOBJECTDETECTION Generates video of detection and metric plots.
+%   createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_array, times_days_array)
+%   - filename_save    (string): Output video filename.
+%   - paths_pairs      (struct array): .image_path, .mask_path.
+%   - metrics_array    (struct array): Metrics per frame.
+%   - times_days_array (numeric vector): Time in days since baseline.
+%   Saves an MPEG-4 video showing images with contours and evolving metric plots.
+%
+%   Example:
+%       createAnimationOfObjectDetection("out.mp4", pairs, metrics, times);
+
     % Create a video writer
     videoWriter = VideoWriter(filename_save, 'MPEG-4');
     videoWriter.Quality = 100;
@@ -419,7 +559,7 @@ function createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_ar
     % Configure tile layout
     tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
     
-    for ind = length(paths_pairs):length(paths_pairs)
+    for ind = 1:length(paths_pairs)
         path_img = paths_pairs(ind).image_path;
         path_mask = paths_pairs(ind).mask_path;
 
@@ -469,14 +609,16 @@ function createAnimationOfObjectDetection(filename_save, paths_pairs, metrics_ar
     disp(['Animation completed and saved as ', filename_save]);
 end
 
-
-
-
 function baseline = computeBaselineFromMetadata(input)
-    % Jeśli podano folder – zbiera wszystkie obrazy; 
-    % jeśli listę plików – bierze je bezpośrednio.
+%COMPUTEBASELINEFROMMETADATA Determines earliest timestamp among images.
+%   baseline = computeBaselineFromMetadata(input)
+%   - input (string folder path, or cell/string array of file paths)
+%   Scans images, extracts numeric timestamps, and returns the minimum as baseline.
+%
+%   Example:
+%       b = computeBaselineFromMetadata("data/imgs");
+
     if ischar(input) && isfolder(input)
-        % katalog
         exts = {'*.png','*.jpg','*.jpeg','*.tiff','*.bmp','*.gif'};
         files = [];
         for k = 1:numel(exts)
@@ -484,7 +626,6 @@ function baseline = computeBaselineFromMetadata(input)
         end
         paths = fullfile(input, {files.name});
     elseif isstring(input) || iscell(input)
-        % lista pełnych ścieżek
         paths = cellstr(input);
     else
         error('computeBaselineFromMetadata: nieprawidłowy typ wejścia.');
@@ -498,3 +639,67 @@ function baseline = computeBaselineFromMetadata(input)
     baseline = min(times);
 end
 
+
+function score = countMatchingPathEnd(path1, path2)
+%COUNTMATCHINGPATHEND Counts matching trailing segments of two paths.
+%   score = countMatchingPathEnd(path1, path2)
+%   - path1, path2 (string): Paths to compare.
+%   Returns count of identical folder/file names starting from the end.
+%
+%   Example:
+%       s = countMatchingPathEnd("a/b/c","x/b/c");  % s == 2
+
+    s1 = fliplr(strsplit(normalizePath(path1), filesep));
+    s2 = fliplr(strsplit(normalizePath(path2), filesep));
+    score = 0;
+    for i = 1:min(length(s1), length(s2))
+        if strcmp(s1{i}, s2{i})
+            score = score + 1;
+        else
+            break;
+        end
+    end
+end
+
+function folders = findDeepestDirs(root_dir, exclude_name)
+%FINDDEEPESTDIRS Finds deepest subdirectories excluding a given name.
+%   folders = findDeepestDirs(root_dir, exclude_name)
+%   - root_dir     (string): Starting directory.
+%   - exclude_name (string): Folder name to skip.
+%   Returns a cell array of full paths to the deepest-level directories.
+%
+%   Example:
+%       dirs = findDeepestDirs("project",".git");
+
+    folders = {};
+    queue = {normalizePath(root_dir)};
+    while ~isempty(queue)
+        current = queue{1};
+        queue(1) = [];
+        subdirs = dir(current);
+        subdirs = subdirs([subdirs.isdir] & ~ismember({subdirs.name}, {'.', '..'}));
+
+        subdirs = subdirs(~strcmp({subdirs.name}, exclude_name));
+
+        if isempty(subdirs)
+            folders{end+1} = current; %#ok<AGROW>
+        else
+            for i = 1:length(subdirs)
+                queue{end+1} = fullfile(current, subdirs(i).name); %#ok<AGROW>
+            end
+        end
+    end
+end
+
+function p = normalizePath(p)
+%NORMALIZEPATH Normalizes file separators to the OS-specific filesep.
+%   p = normalizePath(p)
+%   - p (string): Path to normalize.
+%   Returns the path with consistent '/' or '\' separators.
+%
+%   Example:
+%       np = normalizePath("folder/sub\file.txt");
+
+    p = strrep(p, '/', filesep);
+    p = strrep(p, '\', filesep);
+end
