@@ -133,12 +133,7 @@ class MaskDetector:
 
                 # Initial selection only for first image
                 if not hasattr(self, '_state'):
-                    if self.cfg.init_points_positive is None:
-                        self.logger.info('Select %d positive points', self.cfg.num_positive_points)
-                        pts = get_click_coordinates(cv2.cvtColor(img_proc, cv2.COLOR_RGB2BGR))
-                    else:
-                        pts = self.cfg.init_points_positive
-                    self._state = ImageProcessingState(pos=pts)
+                    self._init_state(img_proc)
 
                 self._state = self.process_single_image(img_proc, self._state)
 
@@ -192,3 +187,13 @@ class MaskDetector:
             n_init=self.cfg.kmeans_n_init,
             random_state=self.cfg.kmeans_random_state)
         return state
+
+    def _init_state(self, img: np.ndarray) -> None:
+        # Initialize state with positive and negative points
+        if self.cfg.init_points_positive is None:
+            self.logger.info('Select %d positive points', self.cfg.num_positive_points)
+            pts = get_click_coordinates(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        else:
+            pts = self.cfg.init_points_positive
+        self._state = ImageProcessingState(pos=pts)
+        self._state = self.process_single_image(img, self._state) # Process the first image for geting the mask and pos/neg points
