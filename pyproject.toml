@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ClearAIM"
+version = "0.5.0"
+description = "ClearAIM is a repository containing scripts for processing and analyzing brain images. It uses the Segment Anything Model (SAM) for mask prediction and then analyzes them, calculating measures such as Weber contrast, area, and generating visualizations of the results."
+authors = [{ name="Kamil Kalinowski", email="kamiljanuszkalinowski@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "torch",
+    "segment_anything",
+    "opencv-python",
+    "numpy",
+    "matplotlib",
+    "tqdm",
+    "torchvision",
+    "scikit-learn",
+    "pyinstaller",
+    "pandas"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
