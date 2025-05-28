@@ -4,19 +4,62 @@
 
 ---
 
-## Setup
+## 🔧 Setup
 
-1. **Install dependencies**
+### ⚡ Quickstart (Windows only)
+
+If you're on Windows, you can initialize the entire project with:
+
+```bat
+setup.bat
+````
+
+This script will:
+
+* Create a virtual environment in `.venv/`
+* Activate the environment
+* Install the project in editable mode (`pip install -e .`)
+* Download the required SAM model if it's not already present
+
+Once complete, the environment is ready.
+
+To activate the environment later, run:
+
+```bat
+.venv\Scripts\activate
+```
+
+---
+
+### 🐧 Manual setup (Linux/macOS or alternative)
+
+1. **Clone the repository and enter the project directory**
 
    ```bash
-   pip install -r requirements.txt
+   git clone https://github.com/QCI-LAB/ClearAIM.git
+   cd ClearAIM
    ```
 
-2. **Download the SAM model**
+2. **Create and activate a virtual environment**
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install the project in editable mode**
+
+   ```bash
+   pip install -e .
+   ```
+
+4. **Download the SAM model**
 
    ```bash
    python setup/download_sam.py
    ```
+
+---
 
 3. **Build standalone executables (optional)**
 
