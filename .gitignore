@@ -1,51 +1,40 @@
-# Ignore all .pyc files
+# Compiled Python files
 *.pyc
+__pycache__/
 
-# Ignore fig and mat files
-*.fig
-*.mat
-
-# Ignore the virtual environment
+# Virtual environment
 venv/
 
-# Ignore images
+# Temporary editor files
+*.asv
+
+# Data and output files
+*.json
+*.csv
+*.npy
+*.mat
+*.fig
+*.log
+*.db
+
+# Model files
+*.pth
+
+# Media files
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.svg
-
-# Ignore logs
-*.log
-
-# Ignore matlab data files
-*.mat
-
-# Ignore output files
-*.json
-*.csv
-*.npy
-
-# Ignore model files
-*.pth
-
-# Ignore avi files
 *.avi
-
-# Ignore mp4 files
 *.mp4
 
-# Ignore asv files
-*.asv
+# Data and result directories
+Materials/
+Results/
 
-# Ignore database files
-*.db
-
-# Ignore images and results
-Materials/*
-Results/*
-
-# Ignore the build directory
+# Build and distribution files
 build/
 dist/
 *.spec
+ClearAIM.egg-info/
