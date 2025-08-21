@@ -3,7 +3,7 @@
 __pycache__/
 
 # Virtual environment
-venv/
+.venv/
 
 # Temporary editor files
 *.asv
